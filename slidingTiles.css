@@ -1,0 +1,19 @@
+div.box {
+  background-color: blue;
+  position: absolute;
+}
+
+#tileBoard {
+  width: 100%;
+  position: relative;
+}
+
+p.boxLabel {
+  font-family: sans-serif;
+  color: white;
+  text-align: center;
+  vertical-align: middle;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}

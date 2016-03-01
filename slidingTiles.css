@@ -16,4 +16,7 @@ p.boxLabel {
   margin: 0;
   border: 0;
   padding: 0;
+  -ms-user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: -moz-none;  
 }

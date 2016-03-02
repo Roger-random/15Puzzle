@@ -7,13 +7,24 @@ var tilePosition = [1, 2, 3, 4,
                     9, 10, 11, 12, 
                     13, 14, 15, -1]
 
+// How long to take to animate a tile
+var tileSlideTime = 25;
+
+// How much space to put between tiles
+var tileSpace = 5;
+
 // Gets the length of a tile's side.
+// The item #tileBoard is told to lay itself out at 100% of available width.
+// We also query for the visible window's inner width and height.
+// The minimum of all of those is the maximum possible dimension to be entirely visible.
+// We divided that by four to correspond to four rows and four columns.
+// Further subtract by however much space we want to put between tiles.
 var getTileDim = function() {
   var tileBoard = $("#tileBoard");
 
   var minDim = Math.min(window.innerWidth, window.innerHeight, tileBoard.innerWidth());
 
-  return (minDim / 4) - 5;
+  return (minDim / 4) - tileSpace;
 }
 
 // Given a tile number, return its index in the array.
@@ -28,18 +39,20 @@ var indexOfTile = function(tileNum) {
   return -1;
 }
 
-// Given a tile number, updates the position of that tile on screen
+// Given a tile number, starts an animation that moves the tile to its
+// corresponding location on screen. Call this after the tile has been
+// moved in the tilePosition[] array.
 var updatePositionOfTile = function(tileNum) {
   var tileIndex = indexOfTile(tileNum);
 
   var tileRow = Math.floor(tileIndex / 4);
   var tileColumn = tileIndex % 4;
-  var tileDim = getTileDim() + 2;
+  var tileDim = getTileDim() + (tileSpace/2);
 
   $("#" + tileNum).animate({
     "left": tileColumn * tileDim,
     "top": tileRow * tileDim
-  }, 25);
+  }, tileSlideTime);
 }
 
 // When the viewport is resized, update size of board accordingly.
@@ -66,22 +79,12 @@ var resizeTiles = function() {
   $("#tileBoard").css("height", (tileDim + 2) * 4);
 }
 
-// Initial setup of game board. Take the HTML for "tileTemplateHost"
-// and clone it 15 times for the game tile. For each tile, the tile
-// text is updated and the ID set to the tile number.
+// Initial setup of game board. Take the HTML for ".box" under the
+// tileTemplateHost" and clone it 15 times for the game tile. 
+// For each tile, the tile text is updated and the ID set to the tile number.
 var setupTiles = function() {
-  var err = $("errorMessage");
   var tileBoard = $("#tileBoard");
-  var tileTemplateHost = $("#tileTemplateHost");
-  var tileTemplate;
-
-  if (tileTemplateHost.length != 1) {
-    err.text("Failed to find template host");
-  }
-  if (tileTemplateHost.children().length != 1) {
-    err.text("Expected only one DIV for template");
-  }
-  tileTemplate = tileTemplateHost.children().first();
+  var tileTemplate = $("#tileTemplateHost .box");
 
   for (var i = 1; i < 16; i++) {
     var newTile = tileTemplate.clone(false, false);

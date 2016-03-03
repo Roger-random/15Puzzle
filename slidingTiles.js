@@ -1,3 +1,6 @@
+//  Blank space is represented as tile number -1
+var tileBlank = -1;
+
 // Array tracks the position of tiles.
 // Index in array = position on the board.
 // Value in the array = number on the tile.
@@ -5,15 +8,27 @@
 var tilePosition = [1, 2, 3, 4, 
                     5, 6, 7, 8, 
                     9, 10, 11, 12, 
-                    13, 14, 15, -1]
+                    13, 14, 15, tileBlank]
+
+// How long to take to animate a tile
+var tileSlideTime = 25;
+
+// How much space to put between tiles, in fraction of maximum tile space. 
+// (0.05 = 5% space)
+var tileSpace = 0.05;
 
 // Gets the length of a tile's side.
+// The item #tileBoard is told to lay itself out at 100% of available width.
+// We also query for the visible window's inner width and height.
+// The minimum of all of those is the maximum possible dimension to be entirely visible.
+// We divided that by four to correspond to four rows and four columns.
+// Further subtract by however much space we want to put between tiles.
 var getTileDim = function() {
   var tileBoard = $("#tileBoard");
 
   var minDim = Math.min(window.innerWidth, window.innerHeight, tileBoard.innerWidth());
 
-  return (minDim / 4) - 5;
+  return (minDim / 4) * (1-tileSpace);
 }
 
 // Given a tile number, return its index in the array.
@@ -25,21 +40,23 @@ var indexOfTile = function(tileNum) {
     }
   }
 
-  return -1;
+  return -1; // This is INDEX, not TILE. -1 does not represent blank, it represents index not found.
 }
 
-// Given a tile number, updates the position of that tile on screen
+// Given a tile number, starts an animation that moves the tile to its
+// corresponding location on screen. Call this after the tile has been
+// moved in the tilePosition[] array.
 var updatePositionOfTile = function(tileNum) {
   var tileIndex = indexOfTile(tileNum);
 
   var tileRow = Math.floor(tileIndex / 4);
   var tileColumn = tileIndex % 4;
-  var tileDim = getTileDim() + 2;
+  var tileDim = getTileDim() * (1/(1-tileSpace));
 
   $("#" + tileNum).animate({
     "left": tileColumn * tileDim,
     "top": tileRow * tileDim
-  }, 25);
+  }, tileSlideTime);
 }
 
 // When the viewport is resized, update size of board accordingly.
@@ -66,22 +83,12 @@ var resizeTiles = function() {
   $("#tileBoard").css("height", (tileDim + 2) * 4);
 }
 
-// Initial setup of game board. Take the HTML for "tileTemplateHost"
-// and clone it 15 times for the game tile. For each tile, the tile
-// text is updated and the ID set to the tile number.
+// Initial setup of game board. Take the HTML for ".box" under the
+// tileTemplateHost" and clone it 15 times for the game tile. 
+// For each tile, the tile text is updated and the ID set to the tile number.
 var setupTiles = function() {
-  var err = $("errorMessage");
   var tileBoard = $("#tileBoard");
-  var tileTemplateHost = $("#tileTemplateHost");
-  var tileTemplate;
-
-  if (tileTemplateHost.length != 1) {
-    err.text("Failed to find template host");
-  }
-  if (tileTemplateHost.children().length != 1) {
-    err.text("Expected only one DIV for template");
-  }
-  tileTemplate = tileTemplateHost.children().first();
+  var tileTemplate = $("#tileTemplateHost .box");
 
   for (var i = 1; i < 16; i++) {
     var newTile = tileTemplate.clone(false, false);
@@ -93,8 +100,8 @@ var setupTiles = function() {
   resizeTiles();
 }
 
-// Checks to see if the two given tile indices can be legally
-// swapped. If so, return true.
+// Checks to see if the two given tile indices can be legally swapped.
+// If so, return true.
 var isValidSwap = function(indexClick, indexBlank) {
   if (indexClick + 1 == indexBlank &&
     indexClick % 4 < 3) {
@@ -112,35 +119,27 @@ var isValidSwap = function(indexClick, indexBlank) {
   return false;
 }
 
-// Click event handler maps click coordinates to a tile index
-// and, if it is adjacent to a blank tile, perform the swap.
+// Click event handler for .box delegated on the #tileBoard. $(this) is the 
+// tile that got clicked on. Retrieve its index in the tilePosition array and
+// the index of the blank to determine if they are adjacent. If so, it is a 
+// valid move, and perform the swap.
 var tileClicked = function(event) {
-  var tileBoard = $("#tileBoard");
-  var boardX = event.pageX - tileBoard.offset().left;
-  var boardY = event.pageY - tileBoard.offset().top;
-  var tileDim = getTileDim();
+  var tileClick = $(this).attr("id");
 
-  var column = Math.floor(boardX / tileDim);
-  var row = Math.floor(boardY / tileDim);
-  
-  if (column > 3 || row > 3) {
-    return;
-  }
-  
-  var indexClick = (row * 4) + column;
-  var tileClick = tilePosition[indexClick];
-
-  var indexBlank = indexOfTile(-1);
+  var indexClick = indexOfTile(tileClick);
+  var indexBlank = indexOfTile(tileBlank);
 
   if (isValidSwap(indexClick, indexBlank)) {
     tilePosition[indexBlank] = tileClick;
-    tilePosition[indexClick] = -1;
+    tilePosition[indexClick] = tileBlank;
     updatePositionOfTile(tileClick);
   };
 }
 
+// Game board setup: generate tiles, size them correctly, and wait for the
+// user to click.
 $(document).ready(function() {
   setupTiles();
   $(window).resize(resizeTiles);
-  $("#tileBoard").on("click", tileClicked);
+  $("#tileBoard").on("click", ".box", tileClicked);
 })

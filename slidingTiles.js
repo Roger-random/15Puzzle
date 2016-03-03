@@ -96,8 +96,8 @@ var setupTiles = function() {
   resizeTiles();
 }
 
-// Checks to see if the two given tile indices can be legally
-// swapped. If so, return true.
+// Checks to see if the two given tile indices can be legally swapped.
+// If so, return true.
 var isValidSwap = function(indexClick, indexBlank) {
   if (indexClick + 1 == indexBlank &&
     indexClick % 4 < 3) {
@@ -115,24 +115,14 @@ var isValidSwap = function(indexClick, indexBlank) {
   return false;
 }
 
-// Click event handler maps click coordinates to a tile index
-// and, if it is adjacent to a blank tile, perform the swap.
+// Click event handler for .box delegated on the #tileBoard. $(this) is the 
+// tile that got clicked on. Retrieve its index in the tilePosition array and
+// the index of the blank to determine if they are adjacent. If so, it is a 
+// valid move, and perform the swap.
 var tileClicked = function(event) {
-  var tileBoard = $("#tileBoard");
-  var boardX = event.pageX - tileBoard.offset().left;
-  var boardY = event.pageY - tileBoard.offset().top;
-  var tileDim = getTileDim();
+  var tileClick = $(this).attr("id");
 
-  var column = Math.floor(boardX / tileDim);
-  var row = Math.floor(boardY / tileDim);
-  
-  if (column > 3 || row > 3) {
-    return;
-  }
-  
-  var indexClick = (row * 4) + column;
-  var tileClick = tilePosition[indexClick];
-
+  var indexClick = indexOfTile(tileClick);
   var indexBlank = indexOfTile(-1);
 
   if (isValidSwap(indexClick, indexBlank)) {
@@ -142,8 +132,10 @@ var tileClicked = function(event) {
   };
 }
 
+// Game board setup: generate tiles, size them correctly, and wait for the
+// user to click.
 $(document).ready(function() {
   setupTiles();
   $(window).resize(resizeTiles);
-  $("#tileBoard").on("click", tileClicked);
+  $("#tileBoard").on("click", ".box", tileClicked);
 })

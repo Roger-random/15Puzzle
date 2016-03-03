@@ -1,3 +1,6 @@
+//  Blank space is represented as tile number -1
+var tileBlank = -1;
+
 // Array tracks the position of tiles.
 // Index in array = position on the board.
 // Value in the array = number on the tile.
@@ -5,7 +8,7 @@
 var tilePosition = [1, 2, 3, 4, 
                     5, 6, 7, 8, 
                     9, 10, 11, 12, 
-                    13, 14, 15, -1]
+                    13, 14, 15, tileBlank]
 
 // How long to take to animate a tile
 var tileSlideTime = 25;
@@ -36,7 +39,7 @@ var indexOfTile = function(tileNum) {
     }
   }
 
-  return -1;
+  return -1; // This is INDEX, not TILE. -1 does not represent blank, it represents index not found.
 }
 
 // Given a tile number, starts an animation that moves the tile to its
@@ -123,11 +126,11 @@ var tileClicked = function(event) {
   var tileClick = $(this).attr("id");
 
   var indexClick = indexOfTile(tileClick);
-  var indexBlank = indexOfTile(-1);
+  var indexBlank = indexOfTile(tileBlank);
 
   if (isValidSwap(indexClick, indexBlank)) {
     tilePosition[indexBlank] = tileClick;
-    tilePosition[indexClick] = -1;
+    tilePosition[indexClick] = tileBlank;
     updatePositionOfTile(tileClick);
   };
 }

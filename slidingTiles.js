@@ -13,8 +13,9 @@ var tilePosition = [1, 2, 3, 4,
 // How long to take to animate a tile
 var tileSlideTime = 25;
 
-// How much space to put between tiles
-var tileSpace = 5;
+// How much space to put between tiles, in fraction of maximum tile space. 
+// (0.05 = 5% space)
+var tileSpace = 0.05;
 
 // Gets the length of a tile's side.
 // The item #tileBoard is told to lay itself out at 100% of available width.
@@ -27,7 +28,7 @@ var getTileDim = function() {
 
   var minDim = Math.min(window.innerWidth, window.innerHeight, tileBoard.innerWidth());
 
-  return (minDim / 4) - tileSpace;
+  return (minDim / 4) * (1-tileSpace);
 }
 
 // Given a tile number, return its index in the array.
@@ -50,7 +51,7 @@ var updatePositionOfTile = function(tileNum) {
 
   var tileRow = Math.floor(tileIndex / 4);
   var tileColumn = tileIndex % 4;
-  var tileDim = getTileDim() + (tileSpace/2);
+  var tileDim = getTileDim() * (1/(1-tileSpace));
 
   $("#" + tileNum).animate({
     "left": tileColumn * tileDim,

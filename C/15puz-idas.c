@@ -10,6 +10,40 @@
 
 /////////////////////////////////////////////////////////////////////////////
 //
+//  Given a position, decode it into row and column.
+//
+void GetColumnRow(int position, int *column, int *row)
+{
+  *column = position % PUZZLE_COLUMN;
+  *row = position / PUZZLE_COLUMN;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//
+//  Simple linear search to find the location of the blank (zero) tile
+//
+int GetBlankPosition(int puzzle[PUZZLE_SIZE])
+{
+    int indexBlank = -1;
+
+    for(int i = 0; i < PUZZLE_SIZE && indexBlank == -1; i++)
+    {
+      if (puzzle[i] == 0)
+      {
+        indexBlank = i;
+      }
+    }
+
+    if (indexBlank==-1)
+    {
+      printf("ERROR: Blank tile not found\n");
+    }
+
+    return indexBlank;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//
 //  Given a lookup table of int[PUZZLE_SIZE][PUZZLE_SIZE], fill in values for
 //  Manhattan Distance lookup. The format of the lookup table is:
 //
@@ -41,8 +75,7 @@ int GenerateManhattanDistanceLookup(int lookupTable[][PUZZLE_SIZE])
       desiredPosition = currentTile-1;
     }
 
-    desiredColumn = desiredPosition % PUZZLE_COLUMN;
-    desiredRow = desiredPosition / PUZZLE_COLUMN;
+    GetColumnRow(desiredPosition, &desiredColumn, &desiredRow);
 
     for (currentPosition = 0; currentPosition < PUZZLE_SIZE; currentPosition++)
     {
@@ -52,8 +85,7 @@ int GenerateManhattanDistanceLookup(int lookupTable[][PUZZLE_SIZE])
       }
       else
       {
-        currentColumn = currentPosition % PUZZLE_COLUMN;
-        currentRow = currentPosition / PUZZLE_COLUMN;
+        GetColumnRow(currentPosition, &currentColumn, &currentRow);
 
         distance = abs(desiredColumn - currentColumn) + abs(desiredRow - currentRow);
       }
@@ -101,6 +133,23 @@ void PrintLookupTable(int lookupTable[][PUZZLE_SIZE])
 
 /////////////////////////////////////////////////////////////////////////////
 //
+//  Print the puzzle state to stdout
+void PrintPuzzle(int puzzle[PUZZLE_SIZE])
+{
+    for(int i = 0; i < PUZZLE_ROW; i++) 
+    {
+      for (int j = 0; j < PUZZLE_COLUMN; j++)
+      {
+        printf("%3d", puzzle[(i*PUZZLE_COLUMN) + j]);
+      }
+      printf("\n");
+    }
+
+    printf("\n");
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//
 //  Calculate value of given puzzle, using the given lookup table
 int CalculateValue(int* puzzle, int lookupTable[][PUZZLE_SIZE])
 {
@@ -112,6 +161,173 @@ int CalculateValue(int* puzzle, int lookupTable[][PUZZLE_SIZE])
   }
 
   return sum;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//
+//  Examine a node and recursively call self to search deeper in the tree
+int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
+  int currentBlankIndex, int prevBlankIndex,
+  int currentLength, int limitLength, int *nextLimit, unsigned long long *nodeCounter)
+{
+  int val = CalculateValue(puzzle, lookupTable);
+
+  (*nodeCounter)++;
+
+  if(puzzle[currentBlankIndex]!=0)
+  {
+    printf("ERROR: Blank index is not blank.\n");
+  }
+
+  // START Debug dump
+  // printf("%d: blank at %d, prev %d. Length %d + Value %d against Limit %d\n",
+  //   *nodeCounter, currentBlankIndex, prevBlankIndex, currentLength, val, limitLength);
+  // PrintPuzzle(puzzle);
+  // END Debug dump
+
+  if (val == 0)
+  {
+    // Problem solved!
+    return currentLength;
+  }
+  else if (currentLength + val > limitLength)
+  {
+    // Exceeded limit
+    if (*nextLimit > currentLength+val)
+    {
+      // Nominate our length+heuristic value as next highest limit
+      *nextLimit = currentLength+val;
+    }
+    return 0;
+  }
+  else
+  {
+    // Not terminating, so let's dig deeper
+    int row=0, col=0, ret=0, childBlankIndex=0;
+
+    GetColumnRow(currentBlankIndex, &col, &row);
+
+    for (int i = 0; i < 4; i++)
+    {
+      if (i==0)
+      {
+        // Try moving the blank up
+        if (row==0)
+        {
+          // Can't move up - it's already on the top row.
+          continue;
+        }
+        else
+        {
+          childBlankIndex = currentBlankIndex - PUZZLE_COLUMN;
+        }
+      }
+      else if (i == 1)
+      {
+        // Try moving the blank down
+        if (row==PUZZLE_ROW-1)
+        {
+          // Can't move down - already on the bottom row.
+          continue;
+        }
+        else
+        {
+          childBlankIndex = currentBlankIndex + PUZZLE_COLUMN;
+        }
+      }
+      else if (i == 2)
+      {
+        // Try moving the blank left
+        if (col == 0)
+        {
+          // Can't move left - already on leftmost column.
+          continue;
+        }
+        else
+        {
+          childBlankIndex = currentBlankIndex - 1;
+        }
+      }
+      else if (i == 3)
+      {
+        // Try moving the blank right
+        if (col == PUZZLE_COLUMN-1)
+        {
+          // Can't move right - already on the rightmost column.
+          continue;
+        }
+        else
+        {
+          childBlankIndex = currentBlankIndex + 1;
+        }
+      }
+
+      if(childBlankIndex == prevBlankIndex)
+      {
+        // This retracts the move our parent just did, no point.
+        continue;
+      }
+
+      // Perform the swap
+      puzzle[currentBlankIndex] = puzzle[childBlankIndex];
+      puzzle[childBlankIndex] = 0;
+
+      // Recursive call to look at the next node
+      ret = ExamineNode(puzzle, lookupTable, 
+        childBlankIndex, currentBlankIndex,
+        currentLength+1, limitLength, nextLimit, nodeCounter);
+
+      // Revert the swap
+      puzzle[childBlankIndex] = puzzle[currentBlankIndex];
+      puzzle[currentBlankIndex] = 0;
+
+      // Did the child find anything?
+      if (ret != 0)
+      {
+        return ret;
+      }
+    }
+
+    // None of the four directions proved fruitful
+    return 0;
+  }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+//  Execute the IDA* algorithm on the given puzzle state with given lookup table
+//  for calculating heuristic.
+//
+int IDAStar(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE])
+{
+  unsigned long long nodesTotal=0;
+  unsigned long long nodesAtLimit = 0;
+  int length = 0;
+  int limit = CalculateValue(puzzle, lookupTable);
+  int nextLimit = 999;
+
+  int blankIndex = GetBlankPosition(puzzle);
+
+  printf("Limit: %d ", limit);
+  while(0 == (length = ExamineNode(puzzle, lookupTable,
+                    blankIndex, -1 /* prevBlankIndex */, 
+                    0 /* Starting length */, limit, 
+                    &nextLimit, &nodesAtLimit)))
+  {
+    printf(" %llu nodes\n", nodesAtLimit);
+    nodesTotal += nodesAtLimit;
+    length = 0;
+    nodesAtLimit = 0;
+    limit = nextLimit;
+    nextLimit = 999;
+    printf("Limit: %d ", limit);
+  }
+  printf(" %llu nodes\n", nodesAtLimit);
+
+  nodesTotal += nodesAtLimit;
+
+  printf("Solution of length %d found after searching %llu nodes\n", length, nodesTotal);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -188,16 +404,7 @@ int PuzzleIsSolvable(int* puzzle)
 
   if (PUZZLE_COLUMN % 2 == 0)
   {
-    int indexBlank = -1;
-
-    for(int i = 0; i < PUZZLE_SIZE && indexBlank == -1; i++)
-    {
-      if (puzzle[i] == 0)
-      {
-        indexBlank = i;
-      }
-    }
-
+    int indexBlank = GetBlankPosition(puzzle);
     int blankEvenRowFromDesired = (((PUZZLE_ROW - (indexBlank/PUZZLE_COLUMN)) % 2) == 1);
 
     if (blankEvenRowFromDesired)
@@ -242,34 +449,29 @@ void ReadPuzzleFromInput(int* puzzle)
 {
   int i;
 
-  printf("15-Puzzle solver\n\n");
-  printf("Here are the tile position indices:\n\n");
-  printf("  0  1  2  3\n");
-  printf("  4  5  6  7\n");
-  printf("  8  9 10 11\n");
-  printf(" 12 13 14 15\n\n");
-  printf("The solution state, with the blank in the lower-right (position index 15), is represented by the sequence\n\n");
-  printf("1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 0\n\n");
+  // printf("15-Puzzle solver\n\n");
+  // printf("Here are the tile position indices:\n\n");
+  // printf("  0  1  2  3\n");
+  // printf("  4  5  6  7\n");
+  // printf("  8  9 10 11\n");
+  // printf(" 12 13 14 15\n\n");
+  // printf("The solution state, with the blank in the lower-right (position index 15), is represented by the sequence\n\n");
+  // printf("1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 0\n\n");
 
   memset(puzzle, 0, sizeof(int)*PUZZLE_SIZE);
 
   do
   {
-    printf("Enter the starting configuration for the puzzle:\n\n");
+    printf("Enter the starting configuration for the puzzle:\n");
 
     for(i = 0; i < PUZZLE_SIZE; i++)
     {
       scanf("%d", &puzzle[i]);
     }
 
-    printf("\n\nThe input received were as follows:\n\n");
+    printf("\nThe input received were as follows:\n\n");
 
-    for(i = 0; i < PUZZLE_SIZE; i++) 
-    {
-      printf("%d ", puzzle[i]);
-    }
-
-    printf("\n\n");
+    PrintPuzzle(puzzle);
   }
   while(!Valid(puzzle));
 }
@@ -281,14 +483,15 @@ void ReadPuzzleFromInput(int* puzzle)
 
 int main()
 {
-  int nodes = 0;
   int puzzle[PUZZLE_SIZE];
   int mdLookup[PUZZLE_SIZE][PUZZLE_SIZE];
 
   GenerateManhattanDistanceLookup(mdLookup);
-  PrintLookupTable(mdLookup);
+  // PrintLookupTable(mdLookup);
  
   ReadPuzzleFromInput(puzzle);
 
   printf("Initial Manhattan Distance value of %d\n\n", CalculateValue(puzzle, mdLookup));
+
+  IDAStar(puzzle, mdLookup);
  }

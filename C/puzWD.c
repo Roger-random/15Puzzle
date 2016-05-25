@@ -1,9 +1,8 @@
 /////////////////////////////////////////////////////////////////////////////
 //
-//  Sliding tile puzzle solver using IDA* search with the Manhattan Distance
+//  Sliding tile puzzle solver using IDA* search with the Walking Distance
 //  heuristic
 //
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +12,201 @@
 #define PUZZLE_SIZE (PUZZLE_COLUMN * PUZZLE_ROW)
 #define PUZZLE_MIN 0
 #define PUZZLE_MAX PUZZLE_SIZE-1
+
+#define FALSE 0
+#define TRUE 1
+
+/////////////////////////////////////////////////////////////////////////////
+//
+//  Adaptation of the Walking Distance algorithm by takaken (puz15wd.c)
+//  
+//  Goals of adaptation in priority order:
+//  * Bring up to current C standard.
+//  * Eliminate use of global variables.
+//  * More comments, and in English.
+//  * Add flexibility for configuration other than 4x4 15-puzzle
+//
+#define BOARD_WIDTH 4
+
+#define WDTBL_SIZE 24964 // Don't understand where this value came from
+#define IDTBL_SIZE 106
+
+typedef unsigned long long u64; // MSVC 'unsigned __int64' now C99 'unsigned long long'
+
+int   TABLE[BOARD_WIDTH][BOARD_WIDTH];
+int   WDTOP, WDEND;
+u64   WDPTN[WDTBL_SIZE];
+short WDLNK[WDTBL_SIZE][2][BOARD_WIDTH];
+char  WDTBL[WDTBL_SIZE];
+char  IDTBL[IDTBL_SIZE];
+char  RESULT[100];
+char  RESULT2[100];
+
+
+
+void WriteTable(char count, int vect, int group)
+{
+  int i,j,k;
+  u64 table;
+
+  // GT: "Find the same pattern"
+  table = 0;
+  for (i=0; j<4; j++)
+  {
+    for (j=0; j<4; j++)
+    {
+      // TABLEis a 4x4 array like the game board.
+      // TABLE[i][j] is something that can be represented in 3 bits (0-7) and
+      // we're packing that into (16*3) = 48 bits, storing in a 64-bit value
+      // 'table'
+      table = (table <<3) | TABLE[i][j];
+    }
+  }
+
+  // Scan values of the WDPTN table.
+  // WDEND represents the index of the first unused entry in the table.
+  for (i=0; i<WDEND; i++)
+  {
+    if (WDPTN[i] == table)
+    {
+      break;
+    }
+  }
+
+  // At this point, if i < WDEND, we found an existing entry in the table
+  // matching our TABLE[i][j] value. If i==WDEND we hit the end without
+  // find it.
+
+  // GT: "New pattern registration"
+  if (i==WDEND)
+  {
+    WDPTN[WDEND] = table;
+    WDTBL[WDEND] = count;
+    WDEND++;
+    for (j=0;j<2;j++)
+    {
+      for (k=0;k<4;k++)
+      {
+        WDLNK[i][j][k] = WDTBL_SIZE;
+      }
+    }
+  }
+
+  // GT: "To form a bidirection link"
+  j = WDTOP - 1;
+  WDLNK[j][vect  ][group] = (short)i;
+  WDLNK[i][vect^1][group] = (short)j; // (vect) XOR (0x1) == flips the LSB on vect.
+}
+
+// GT: "Seek WalkingDistance in the breadth-first search"
+void Simulation()
+{
+  int i,j,k,space=0,piece;
+  char count;
+  u64 table;
+
+  // GT: "Make the initial surface"
+  for (i=0; i<4; i++)
+  {
+    for (j=0; j<4; j++)
+    {
+      TABLE[i][j] = 0;
+    }
+  }
+  TABLE[0][0] = TABLE[1][1] = TABLE[2][2] = 4;
+  TABLE[3][3] = 3;
+  table = 0;
+  for (i=0; i<4; i++)
+  {
+    for (j=0; j<4; j++)
+    {
+      table = (table<<3) | TABLE[i][j];
+    }
+  }
+
+  // GT: "Register the initial surface"
+  WDPTN[0] = table;
+  WDTBL[0] = 0;
+  for (j=0; j<2; j++)
+  {
+    for (k=0; k<4; k++)
+    {
+      WDLNK[0][j][k] = WDTBL_SIZE;
+    }
+  }
+
+  // GT: "Breadth-first search"
+  WDTOP=0;
+  WDEND=1;
+  while (WDTOP < WDEND)
+  {
+    // GT: "TABLE[] call"
+    table = WDPTN[WDTOP];
+    count = WDTBL[WDTOP];
+    WDTOP++;
+    count++;
+
+    // GT: "Reproduction" (Also: reappearance/return/revival)
+
+    // Looks like taking the 'table' value and decoding it to the 4x4 TABLE
+    //  Also sets 'space' to a value indicating [row?] of space.
+    //  But what's going with 'piece'?
+    for (i=3; i>=0; i--)
+    {
+      piece = 0;
+      for (j=3; j>=0; j--)
+      {
+        TABLE[i][j] = (int)(table&7);
+        table >>= 3;
+        piece += TABLE[i][j];
+      }
+      if (piece==3)
+      {
+        space = i;
+      }
+    }
+
+    // GT: "0: Move the piece to the top"
+    if ((piece = space + 1) < 4)
+    {
+      for (i=0; i<4; i++)
+      {
+        if (TABLE[piece][i])
+        {
+          TABLE[piece][i]--;
+          TABLE[space][i]++;
+          WriteTable(count, 0, i);
+          TABLE[piece][i]++;
+          TABLE[space][i]--;
+        }
+      }
+    }
+
+    // GT: "1: Move the piece down"
+    if ((piece = space - 1) >= 0)
+    {
+      for (i=0; i<4; i++)
+      {
+        if (TABLE[piece][i])
+        {
+          TABLE[piece][i]--;
+          TABLE[space][i]++;
+          WriteTable(count, 1, i);
+          TABLE[piece][i]++;
+          TABLE[space][i]--;
+        }
+      }
+    }
+  }
+
+
+  ///////////////////////////////////////////////////////////////////////////
+  for (i=0; i<IDTBL_SIZE; i++)
+  {
+    IDTBL[i] = (char)((i/3) + (i%3));
+  }
+
+}
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -50,95 +244,6 @@ int GetBlankPosition(int puzzle[PUZZLE_SIZE])
 
 /////////////////////////////////////////////////////////////////////////////
 //
-//  Given a lookup table of int[PUZZLE_SIZE][PUZZLE_SIZE], fill in values for
-//  Manhattan Distance lookup. The format of the lookup table is:
-//
-//  First index: The tile number. 
-//  Second index: The position of the tile.
-//  Value: Manhattan Distance for that tile.
-
-int GenerateManhattanDistanceLookup(int lookupTable[][PUZZLE_SIZE])
-{
-  int currentTile = 0;
-  int currentPosition = 0;
-  int currentColumn = 0;
-  int currentRow = 0;
-  int desiredPosition = 0;
-  int desiredColumn = 0;
-  int desiredRow = 0;
-  int distance = 0;
-
-  printf("\nGenerating Manhattan Distance lookup table\n");
-
-  for (currentTile = 0; currentTile < PUZZLE_SIZE; currentTile++)
-  {
-    if (currentTile == 0)
-    {
-      desiredPosition = PUZZLE_SIZE-1;
-    }
-    else
-    {
-      desiredPosition = currentTile-1;
-    }
-
-    GetColumnRow(desiredPosition, &desiredColumn, &desiredRow);
-
-    for (currentPosition = 0; currentPosition < PUZZLE_SIZE; currentPosition++)
-    {
-      if (currentTile == 0)
-      {
-        distance = 0;
-      }
-      else
-      {
-        GetColumnRow(currentPosition, &currentColumn, &currentRow);
-
-        distance = abs(desiredColumn - currentColumn) + abs(desiredRow - currentRow);
-      }
-
-      lookupTable[currentTile][currentPosition] = distance;
-    }
-  }
-}
-
-/////////////////////////////////////////////////////////////////////////////
-//
-//  Print the lookup table to stdout
-//
-
-void PrintLookupTable(int lookupTable[][PUZZLE_SIZE])
-{
-  int printColumn = 0,
-      printRow = 0,
-      tableColumn = 0,
-      tableRow = 0,
-      tileIndex = 0,
-      tableIndex = 0;
-
-  printf("\nThe lookup table is as follows:\n");
-
-  for (printRow = 0; printRow < PUZZLE_ROW; printRow++)
-  {
-    for (tableRow = 0; tableRow < PUZZLE_ROW; tableRow++)
-    {
-      for (printColumn = 0; printColumn < PUZZLE_COLUMN; printColumn++)
-      {
-        tileIndex = (printRow*PUZZLE_COLUMN) + printColumn;
-        for (tableColumn = 0; tableColumn < PUZZLE_COLUMN; tableColumn++)
-        {
-          tableIndex = (tableRow*PUZZLE_COLUMN) + tableColumn;
-          printf("%2d", lookupTable[tileIndex][tableIndex]);
-        }
-        printf("  ");
-      }
-      printf("\n");
-    }
-    printf("\n\n");
-  }
-}
-
-/////////////////////////////////////////////////////////////////////////////
-//
 //  Print the puzzle state to stdout
 void PrintPuzzle(int puzzle[PUZZLE_SIZE])
 {
@@ -159,14 +264,159 @@ void PrintPuzzle(int puzzle[PUZZLE_SIZE])
 //  Calculate value of given puzzle, using the given lookup table
 int CalculateValue(int* puzzle, int lookupTable[][PUZZLE_SIZE])
 {
-  int sum = 0;
+  int i, j, num1, num2, wd1, wd2, id1, id2;
+  int idx1,idx2,inv1,inv2,lowb1,lowb2;
 
-  for(int i = 0; i < PUZZLE_SIZE; i++)
+  int work[PUZZLE_COLUMN];
+
+  int CONV[PUZZLE_SIZE] = { // Flips the board 90-degrees so we can reuse
+    0,                      // lookup table along the other axis.
+    1, 5, 9,13,
+    2, 6,10,14,
+    3, 7,11,15,
+    4, 8,12
+  };
+
+  int convp[PUZZLE_SIZE] = { // Flips the board INDICES 90 degrees.
+    0, 4, 8,12, 
+    1, 5, 9,13, 
+    2, 6,10,14, 
+    3, 7,11,15
+  };
+
+  u64 table;
+
+  // Calculate IDX1
+  table = 0;
+  for (i=0;i<PUZZLE_ROW;i++)
   {
-    sum += lookupTable[puzzle[i]][i];
+    // Initialize work array
+    for (j=0; j<PUZZLE_COLUMN; j++)
+    {
+      work[j] = 0;
+    }
+
+    for (j=0; j<PUZZLE_COLUMN; j++)
+    {
+      num1 = puzzle[i*PUZZLE_COLUMN + j];
+      if (num1 == 0)
+      {
+        // Skip blank tile
+        continue;
+      }
+      // Take the tile number, subtract one, then drop the least significant 
+      // 2 bits (a.k.a. divide by four) gives us the desired row number for
+      // that tile. Increment the desired row counter in the work array.
+      work[(num1-1)>>2]++;
+    }
+
+    // Pack results of work array into table encoding
+    for (j=0; j<PUZZLE_COLUMN; j++)
+    {
+      table = (table<<3) | work[j];
+    }
+  }
+  printf("Looking for table value %llu\n", table);
+  for (idx1=0; WDPTN[idx1] != table; idx1++)
+  {
+    if(idx1 >= WDTBL_SIZE)
+    {
+      printf("WARNING: search for idx1 has ran off the rails. Debugger time!");
+      idx1 = 0;
+    }
   }
 
-  return sum;
+  // Calculate IDX2
+  table = 0;
+  for (i=0; i<PUZZLE_ROW; i++)
+  {
+    // Initialize work array
+    for (j=0; j<PUZZLE_COLUMN; j++)
+    {
+      work[j] = 0;
+    }
+
+    for (j=0; j<PUZZLE_COLUMN; j++)
+    {
+      num2 = CONV[puzzle[j*PUZZLE_ROW + i]];
+      if (num2 == 0)
+      {
+        // Skip blank tile
+        continue;
+      }
+      // Take the tile number, subtract one, then drop the least significant 
+      // 2 bits (a.k.a. divide by four) gives us the desired row number for
+      // that tile. Increment the desired row counter in the work array.
+      work[(num2-1)>>2]++;
+    }
+
+    // Pack results of work array into table encoding
+    for (j=0; j<PUZZLE_COLUMN; j++)
+    {
+      table = (table<<3) | work[j];
+    }
+  }
+  printf("Looking for table value %llu\n", table);
+  for (idx2=0; WDPTN[idx2] != table; idx2++)
+  {
+    if(idx2 >= WDTBL_SIZE)
+    {
+      printf("WARNING: search for idx2 has ran off the rails. Debugger time!");
+      idx2 = 0;
+    }
+  }
+
+  // Calculate inv1
+  inv1 = 0;
+  for (i=0; i<PUZZLE_SIZE; i++)
+  {
+    num1 = puzzle[i];
+    if (!num1)
+    {
+      // Skip blank
+      continue;
+    }
+
+    for (j=i+1; j<PUZZLE_SIZE; j++)
+    {
+      num2 = puzzle[j];
+      if (num2 && num2<num1)
+      {
+        inv1++;
+      }
+    }
+  }
+
+  // Calculate inv2
+  inv2 = 0;
+  for (i=0; i<PUZZLE_SIZE; i++)
+  {
+    num1 = CONV[puzzle[convp[i]]];
+    if (!num1)
+    {
+      // Skip blank
+      continue;
+    }
+    for (j=i+1; j<PUZZLE_SIZE; j++)
+    {
+      num2 = CONV[puzzle[convp[j]]];
+      if (num2 && num2<num1)
+      {
+        inv2++;
+      }
+    }
+  }
+
+  // Put it all together for the walking distance
+  wd1 = WDTBL[idx1];
+  wd2 = WDTBL[idx2];
+  id1 = IDTBL[inv1];
+  id2 = IDTBL[inv2];
+  lowb1 = (wd1>id1)? wd1:id1;
+  lowb2 = (wd2>id2)? wd2:id2;
+  printf("(WD=%d/%d, ID=%d/%d) LowerBound=%d\n", wd1, wd2, id1, id2, lowb1+lowb2);
+
+  return lowb1+lowb2;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -492,12 +742,11 @@ int main()
   int puzzle[PUZZLE_SIZE];
   int mdLookup[PUZZLE_SIZE][PUZZLE_SIZE];
 
-  GenerateManhattanDistanceLookup(mdLookup);
-  // PrintLookupTable(mdLookup);
- 
+  Simulation();
+
   ReadPuzzleFromInput(puzzle);
 
-  printf("Initial Manhattan Distance value of %d\n\n", CalculateValue(puzzle, mdLookup));
+  printf("Initial heuristic value of %d\n\n", CalculateValue(puzzle, mdLookup));
 
-  IDAStar(puzzle, mdLookup);
+  //IDAStar(puzzle, mdLookup);
  }

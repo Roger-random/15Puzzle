@@ -51,7 +51,7 @@ void WriteTable(char count, int vect, int group)
 
   // GT: "Find the same pattern"
   table = 0;
-  for (i=0; j<4; j++)
+  for (i=0; i<4; i++)
   {
     for (j=0; j<4; j++)
     {
@@ -120,7 +120,7 @@ void Simulation()
   {
     for (j=0; j<4; j++)
     {
-      table = (table<<3) | TABLE[i][j];
+      table = (table << 3) | TABLE[i][j];
     }
   }
 
@@ -199,13 +199,13 @@ void Simulation()
     }
   }
 
-
   ///////////////////////////////////////////////////////////////////////////
   for (i=0; i<IDTBL_SIZE; i++)
   {
     IDTBL[i] = (char)((i/3) + (i%3));
   }
 
+  printf("Lookup table completed with WDTOP=%d, WDEND=%d\n", WDTOP, WDEND);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -316,14 +316,11 @@ int CalculateValue(int* puzzle, int lookupTable[][PUZZLE_SIZE])
       table = (table<<3) | work[j];
     }
   }
-  printf("Looking for table value %llu\n", table);
-  for (idx1=0; WDPTN[idx1] != table; idx1++)
+  for (idx1=0; WDPTN[idx1] != table && idx1 < WDTBL_SIZE; idx1++);
+
+  if(idx1 >= WDTBL_SIZE)
   {
-    if(idx1 >= WDTBL_SIZE)
-    {
-      printf("WARNING: search for idx1 has ran off the rails. Debugger time!");
-      idx1 = 0;
-    }
+    printf("WARNING: search for idx1 has ran off the rails. Debugger time!");
   }
 
   // Calculate IDX2
@@ -356,14 +353,11 @@ int CalculateValue(int* puzzle, int lookupTable[][PUZZLE_SIZE])
       table = (table<<3) | work[j];
     }
   }
-  printf("Looking for table value %llu\n", table);
-  for (idx2=0; WDPTN[idx2] != table; idx2++)
+  for (idx2=0; WDPTN[idx2] != table && idx2 < WDTBL_SIZE; idx2++);
+
+  if(idx2 >= WDTBL_SIZE)
   {
-    if(idx2 >= WDTBL_SIZE)
-    {
-      printf("WARNING: search for idx2 has ran off the rails. Debugger time!");
-      idx2 = 0;
-    }
+    printf("WARNING: search for idx2 has ran off the rails. Debugger time!");
   }
 
   // Calculate inv1
@@ -414,7 +408,7 @@ int CalculateValue(int* puzzle, int lookupTable[][PUZZLE_SIZE])
   id2 = IDTBL[inv2];
   lowb1 = (wd1>id1)? wd1:id1;
   lowb2 = (wd2>id2)? wd2:id2;
-  printf("(WD=%d/%d, ID=%d/%d) LowerBound=%d\n", wd1, wd2, id1, id2, lowb1+lowb2);
+  // printf("(WD=%d/%d, ID=%d/%d) LowerBound=%d\n", wd1, wd2, id1, id2, lowb1+lowb2);
 
   return lowb1+lowb2;
 }
@@ -565,23 +559,26 @@ int IDAStar(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE])
 
   int blankIndex = GetBlankPosition(puzzle);
 
-  printf("Limit: %d ", limit);
-  while(0 == (length = ExamineNode(puzzle, lookupTable,
-                    blankIndex, -1 /* prevBlankIndex */, 
-                    0 /* Starting length */, limit, 
-                    &nextLimit, &nodesAtLimit)))
+  if (limit > 0)
   {
-    printf(" %llu nodes\n", nodesAtLimit);
-    nodesTotal += nodesAtLimit;
-    length = 0;
-    nodesAtLimit = 0;
-    limit = nextLimit;
-    nextLimit = 999;
     printf("Limit: %d ", limit);
-  }
-  printf(" %llu nodes\n", nodesAtLimit);
+    while(0 == (length = ExamineNode(puzzle, lookupTable,
+                      blankIndex, -1 /* prevBlankIndex */, 
+                      0 /* Starting length */, limit, 
+                      &nextLimit, &nodesAtLimit)))
+    {
+      printf(" %llu nodes\n", nodesAtLimit);
+      nodesTotal += nodesAtLimit;
+      length = 0;
+      nodesAtLimit = 0;
+      limit = nextLimit;
+      nextLimit = 999;
+      printf("Limit: %d ", limit);
+    }
+    printf(" %llu nodes\n", nodesAtLimit);
 
-  nodesTotal += nodesAtLimit;
+    nodesTotal += nodesAtLimit;
+  }
 
   printf("Solution of length %d found after searching %llu nodes\n", length, nodesTotal);
 }
@@ -748,5 +745,5 @@ int main()
 
   printf("Initial heuristic value of %d\n\n", CalculateValue(puzzle, mdLookup));
 
-  //IDAStar(puzzle, mdLookup);
+  IDAStar(puzzle, mdLookup);
  }

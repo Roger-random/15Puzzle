@@ -1,0 +1,62 @@
+roger@Roger-Z87G41:~/Git/15Puzzle/C$ time ./a.out < test.md38-1.txt
+
+Generating Manhattan Distance lookup table
+Enter the starting configuration for the puzzle:
+
+The input received were as follows:
+
+  6  7 11 13
+  9  0  5 12
+  8  3  4 10
+  2 14 15  1
+
+Initial Manhattan Distance value of 38
+
+Limit: 38  64 nodes
+Limit: 40  575 nodes
+Limit: 42  4145 nodes
+Limit: 44  26406 nodes
+Limit: 46  152570 nodes
+Limit: 48  838064 nodes
+Limit: 50  4538587 nodes
+Limit: 52  24255015 nodes
+Limit: 54  32199137 nodes
+Solution of length 54 found after searching 62014563 nodes
+
+real	0m4.091s
+user	0m4.088s
+sys	0m0.000s
+
+
+roger@Roger-Z87G41:~/Git/15Puzzle/C$ time ./a.out < test.md80-1.txt 
+
+Generating Manhattan Distance lookup table
+Enter the starting configuration for the puzzle:
+
+The input received were as follows:
+
+  0 12  9 13
+ 15 11 10 14
+  3  7  2  5
+  4  8  6  1
+
+Initial Manhattan Distance value of 58
+
+Limit: 58  3 nodes
+Limit: 60  13 nodes
+Limit: 62  1415 nodes
+Limit: 64  32379 nodes
+Limit: 66  662121 nodes
+Limit: 68  10583641 nodes
+Limit: 70  137045050 nodes
+Limit: 72  1549991116 nodes
+Limit: 74  15898045165 nodes
+Limit: 76  151281457005 nodes
+Limit: 78  1355466486761 nodes
+Limit: 80  151806589884 nodes
+Solution of length 80 found after searching 1676150894553 nodes
+
+real	3452m20.436s
+user	1801m44.472s
+sys	0m6.956s
+

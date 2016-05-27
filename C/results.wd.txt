@@ -1,0 +1,26 @@
+roger@Roger-Z87G41:~/Git/15Puzzle/C$ time ./puzWD < test.md38-1.txt 
+Lookup table completed with WDTOP=24964, WDEND=24964
+Enter the starting configuration for the puzzle:
+
+The input received were as follows:
+
+  6  7 11 13
+  9  0  5 12
+  8  3  4 10
+  2 14 15  1
+
+Initial heuristic value of 42
+
+Limit: 42  14 nodes
+Limit: 44  171 nodes
+Limit: 46  1906 nodes
+Limit: 48  15866 nodes
+Limit: 50  117143 nodes
+Limit: 52  819857 nodes
+Limit: 54  1100615 nodes
+Solution of length 54 found after searching 2055572 nodes
+
+real	0m47.494s
+user	0m47.464s
+sys	0m0.000s
+roger@Roger-Z87G41:~/Git/15Puzzle/C$

@@ -140,6 +140,7 @@ void PrintLookupTable(int lookupTable[][PUZZLE_SIZE])
 /////////////////////////////////////////////////////////////////////////////
 //
 //  Print the puzzle state to stdout
+
 void PrintPuzzle(int puzzle[PUZZLE_SIZE])
 {
     for(int i = 0; i < PUZZLE_ROW; i++) 
@@ -157,6 +158,7 @@ void PrintPuzzle(int puzzle[PUZZLE_SIZE])
 /////////////////////////////////////////////////////////////////////////////
 //
 //  Calculate value of given puzzle, using the given lookup table
+
 int CalculateValue(int* puzzle, int lookupTable[][PUZZLE_SIZE])
 {
   int sum = 0;
@@ -172,6 +174,7 @@ int CalculateValue(int* puzzle, int lookupTable[][PUZZLE_SIZE])
 /////////////////////////////////////////////////////////////////////////////
 //
 //  Examine a node and recursively call self to search deeper in the tree
+
 int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
   int currentBlankIndex, int prevBlankIndex,
   int currentLength, int limitLength, int *nextLimit, unsigned long long *nodeCounter)
@@ -179,6 +182,13 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
   int val = CalculateValue(puzzle, lookupTable);
 
   (*nodeCounter)++;
+
+  if (((*nodeCounter) % 1000000000) == 0)
+  {
+    // Status update every billion nodes
+    printf("Limit: %d ongoing - with %llu nodes\n", limitLength, *nodeCounter);
+  }
+
 
   if(puzzle[currentBlankIndex]!=0)
   {
@@ -315,23 +325,23 @@ int IDAStar(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE])
 
   int blankIndex = GetBlankPosition(puzzle);
 
-  printf("Limit: %d ", limit);
-  while(0 == (length = ExamineNode(puzzle, lookupTable,
-                    blankIndex, -1 /* prevBlankIndex */, 
-                    0 /* Starting length */, limit, 
-                    &nextLimit, &nodesAtLimit)))
+  if (limit > 0)
   {
-    printf(" %llu nodes\n", nodesAtLimit);
-    nodesTotal += nodesAtLimit;
-    length = 0;
-    nodesAtLimit = 0;
-    limit = nextLimit;
-    nextLimit = 999;
-    printf("Limit: %d ", limit);
-  }
-  printf(" %llu nodes\n", nodesAtLimit);
+    while(0 == (length = ExamineNode(puzzle, lookupTable,
+                      blankIndex, -1 /* prevBlankIndex */, 
+                      0 /* Starting length */, limit, 
+                      &nextLimit, &nodesAtLimit)))
+    {
+      printf("Limit: %d completed with %llu nodes\n", limit, nodesAtLimit);
+      nodesTotal += nodesAtLimit;
+      length = 0;
+      nodesAtLimit = 0;
+      limit = nextLimit;
+      nextLimit = 999;
+    }
 
-  nodesTotal += nodesAtLimit;
+    nodesTotal += nodesAtLimit;
+  }
 
   printf("Solution of length %d found after searching %llu nodes\n", length, nodesTotal);
 }

@@ -18,3 +18,7 @@ This applies the iterative-deepening A* (IDA*) algorithm to solving the puzzle, 
 #### puzWD.c
 
 This applies the same IDA* algorithm to the puzzle, but using the Walking Distance heuristic (as described by Ken'ichiro Takahashi and adapted from his/her code). Advantage: Compared to Manhattan Distance, it culls the number of nodes examined by as much as 98%. Disadvantage: Compared to Manhattan Distance, it is much slower in execution. Part of the problem is that the lookup tables are too big for L2 cache and must go into L3 or even overflow into main memory.
+
+## Directory: /Test/
+
+This directory holds test cases that can be piped in as input to the various different implementations of 15-puzzle solver programs.

@@ -39,9 +39,14 @@ u64   WDPTN[WDTBL_SIZE];
 short WDLNK[WDTBL_SIZE][2][BOARD_WIDTH];
 char  WDTBL[WDTBL_SIZE];
 char  IDTBL[IDTBL_SIZE];
-char  RESULT[100];
-char  RESULT2[100];
 
+int CONV[PUZZLE_SIZE] = { // Flips the board 90-degrees so we can reuse
+  0,                      // lookup table along the other axis.
+  1, 5, 9,13,
+  2, 6,10,14,
+  3, 7,11,15,
+  4, 8,12
+};
 
 
 void WriteTable(char count, int vect, int group)
@@ -212,6 +217,7 @@ void Simulation()
 //
 //  Given a position, decode it into row and column.
 //
+
 void GetColumnRow(int position, int *column, int *row)
 {
   *column = position % PUZZLE_COLUMN;
@@ -222,6 +228,7 @@ void GetColumnRow(int position, int *column, int *row)
 //
 //  Simple linear search to find the location of the blank (zero) tile
 //
+
 int GetBlankPosition(int puzzle[PUZZLE_SIZE])
 {
     int indexBlank = -1;
@@ -245,6 +252,7 @@ int GetBlankPosition(int puzzle[PUZZLE_SIZE])
 /////////////////////////////////////////////////////////////////////////////
 //
 //  Print the puzzle state to stdout
+
 void PrintPuzzle(int puzzle[PUZZLE_SIZE])
 {
     for(int i = 0; i < PUZZLE_ROW; i++) 
@@ -261,21 +269,15 @@ void PrintPuzzle(int puzzle[PUZZLE_SIZE])
 
 /////////////////////////////////////////////////////////////////////////////
 //
-//  Calculate value of given puzzle, using the given lookup table
-int CalculateValue(int* puzzle, int lookupTable[][PUZZLE_SIZE])
+//  Calculate heuristic value of given puzzle
+
+int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *pinv2)
 {
   int i, j, num1, num2, wd1, wd2, id1, id2;
-  int idx1,idx2,inv1,inv2,lowb1,lowb2;
+  int idx1, idx2, inv1, inv2;
+  int lowb1,lowb2;
 
   int work[PUZZLE_COLUMN];
-
-  int CONV[PUZZLE_SIZE] = { // Flips the board 90-degrees so we can reuse
-    0,                      // lookup table along the other axis.
-    1, 5, 9,13,
-    2, 6,10,14,
-    3, 7,11,15,
-    4, 8,12
-  };
 
   int convp[PUZZLE_SIZE] = { // Flips the board INDICES 90 degrees.
     0, 4, 8,12, 
@@ -410,23 +412,31 @@ int CalculateValue(int* puzzle, int lookupTable[][PUZZLE_SIZE])
   lowb2 = (wd2>id2)? wd2:id2;
   // printf("(WD=%d/%d, ID=%d/%d) LowerBound=%d\n", wd1, wd2, id1, id2, lowb1+lowb2);
 
+  *pidx1 = idx1;
+  *pidx2 = idx2;
+  *pinv1 = inv1;
+  *pinv2 = inv2;
+
   return lowb1+lowb2;
 }
 
 /////////////////////////////////////////////////////////////////////////////
 //
 //  Examine a node and recursively call self to search deeper in the tree
-int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
+
+int ExamineNode(int puzzle[PUZZLE_SIZE],
   int currentBlankIndex, int prevBlankIndex,
+  int idx1o, int idx2o, int inv1o, int inv2o,
   int currentLength, int limitLength, int *nextLimit, unsigned long long *nodeCounter)
 {
-  int val = CalculateValue(puzzle, lookupTable);
+  int val;
+  int fallback = 0;
 
   (*nodeCounter)++;
 
-  if (((*nodeCounter) % 100000000) == 0)
+  if (((*nodeCounter) % 1000000000) == 0)
   {
-    // Status update every hundred million nodes
+    // Status update every billion nodes
     printf("Limit: %d ongoing - with %llu nodes\n", limitLength, *nodeCounter);
   }  
 
@@ -434,6 +444,59 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
   {
     printf("ERROR: Blank index is not blank.\n");
   }
+
+  int idx1 = idx1o;
+  int idx2 = idx2o;
+  int inv1 = inv1o;
+  int inv2 = inv2o;
+
+  int wd1 = WDTBL[idx1];
+  int wd2 = WDTBL[idx2];
+  int id1 = IDTBL[inv1];
+  int id2 = IDTBL[inv2];
+  int lowb1 = (wd1 > id1) ? wd1 : id1;
+  int lowb2 = (wd2 > id2) ? wd2 : id2;
+
+  val = lowb1 + lowb2;
+
+
+/*  {
+    // Verification block
+    int verify, vidx1, vidx2, vinv1, vinv2;
+    verify = CalculateIndicesFull(puzzle, &vidx1, &vidx2, &vinv1, &vinv2);
+
+    if (verify != val)
+    {
+      printf("Full calculation returned value of %d but partial update got %d\n", verify, val);
+      fallback = 1;
+    }
+
+    if (vidx1 != idx1)
+    {
+      printf("Full calculation returned idx1 of %d but partial update got %d\n", vidx1, idx1);
+    }
+
+    if (vidx2 != idx2)
+    {
+      printf("Full calculation returned idx2 of %d but partial update got %d\n", vidx2, idx2);
+    }
+
+    if (vinv1 != inv1)
+    {
+      printf("Full calculation returned inv1 of %d but partial update got %d\n", vinv1, inv1);
+    }
+
+    if (vinv2 != inv2)
+    {
+      printf("Full calculation returned inv2 of %d but partial update got %d\n", vinv2, inv2);
+    }
+
+    if (fallback)
+    {
+      val = verify;
+    }
+  }
+*/
 
   // START Debug dump
   // printf("%d: blank at %d, prev %d. Length %d + Value %d against Limit %d\n",
@@ -464,8 +527,15 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
 
     GetColumnRow(currentBlankIndex, &col, &row);
 
+    // printf("Starting idx1=%d idx2=%d inv1=%d inv2=%d\n", idx1, idx2, inv1, inv2);
+
     for (int i = 0; i < 4; i++)
     {
+      idx1 = idx1o;
+      idx2 = idx2o;
+      inv1 = inv1o;
+      inv2 = inv2o;
+
       if (i==0)
       {
         // Try moving the blank up
@@ -477,6 +547,22 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
         else
         {
           childBlankIndex = currentBlankIndex - PUZZLE_COLUMN;
+
+          for (int j = childBlankIndex+1; j < currentBlankIndex; j++)
+          {
+            if (puzzle[j] > puzzle[childBlankIndex])
+            {
+              inv1++;
+            }
+            else
+            {
+              inv1--;
+            }
+          }
+
+          idx1 = WDLNK[idx1][1][(puzzle[childBlankIndex]-1)>>2];
+
+          // printf("Updated 1A idx1=%d inv1=%d\n",idx1,inv1);
         }
       }
       else if (i == 1)
@@ -490,6 +576,24 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
         else
         {
           childBlankIndex = currentBlankIndex + PUZZLE_COLUMN;
+
+          // Scan the tiles between space and tile to update inversion count
+          for (int j = currentBlankIndex+1; j < childBlankIndex; j++)
+          {
+            if (puzzle[j] > puzzle[childBlankIndex])
+            {
+              inv1--;
+            }
+            else
+            {
+              inv1++;
+            }
+          }
+
+          // Use the link table to update the index corresponding to the moved tile.
+          idx1 = WDLNK[idx1][0][(puzzle[childBlankIndex]-1)>>2];
+
+          // printf("Updated 1B idx1=%d inv1=%d\n",idx1,inv1);
         }
       }
       else if (i == 2)
@@ -503,6 +607,36 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
         else
         {
           childBlankIndex = currentBlankIndex - 1;
+
+          int convTile = CONV[puzzle[childBlankIndex]];
+
+          for (int j = childBlankIndex + PUZZLE_COLUMN; j < PUZZLE_SIZE; j+= PUZZLE_COLUMN)
+          {
+            if (CONV[puzzle[j]] > convTile)
+            {
+              inv2++;
+            }
+            else
+            {
+              inv2--;
+            }
+          }
+
+          for (int j = currentBlankIndex - PUZZLE_COLUMN; j >= 0; j -= PUZZLE_COLUMN)
+          {
+            if (CONV[puzzle[j]] > convTile)
+            {
+              inv2++;
+            }
+            else
+            {
+              inv2--;
+            }
+          }
+
+          idx2 = WDLNK[idx2][1][(convTile-1)>>2];
+
+          // printf("Updated 2A idx2=%d inv2=%d\n", idx2, inv2);
         }
       }
       else if (i == 3)
@@ -516,12 +650,43 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
         else
         {
           childBlankIndex = currentBlankIndex + 1;
+
+          int convTile = CONV[puzzle[childBlankIndex]];
+
+          for (int j = currentBlankIndex+PUZZLE_COLUMN; j < PUZZLE_SIZE; j += PUZZLE_COLUMN)
+          {
+            if (CONV[puzzle[j]] > convTile)
+            {
+              inv2--;
+            }
+            else
+            {
+              inv2++;
+            }
+          }
+
+          for (int j = childBlankIndex- PUZZLE_COLUMN; j >= 0; j -= PUZZLE_COLUMN)
+          {
+            if (CONV[puzzle[j]] > convTile)
+            {
+              inv2--;
+            }
+            else
+            {
+              inv2++;
+            }
+          }
+
+          idx2 = WDLNK[idx2][0][(convTile-1) >> 2];
+
+          // printf("Updated 2B idx2=%d inv2=%d\n", idx2, inv2);
         }
       }
 
       if(childBlankIndex == prevBlankIndex)
       {
         // This retracts the move our parent just did, no point.
+        // printf("Reverted\n");
         continue;
       }
 
@@ -530,8 +695,9 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
       puzzle[childBlankIndex] = 0;
 
       // Recursive call to look at the next node
-      ret = ExamineNode(puzzle, lookupTable, 
+      ret = ExamineNode(puzzle, 
         childBlankIndex, currentBlankIndex,
+        idx1, idx2, inv1, inv2,
         currentLength+1, limitLength, nextLimit, nodeCounter);
 
       // Revert the swap
@@ -557,20 +723,22 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
 //  Execute the IDA* algorithm on the given puzzle state with given lookup table
 //  for calculating heuristic.
 //
-int IDAStar(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE])
+int IDAStar(int puzzle[PUZZLE_SIZE])
 {
   unsigned long long nodesTotal=0;
   unsigned long long nodesAtLimit = 0;
   int length = 0;
-  int limit = CalculateValue(puzzle, lookupTable);
+  int idx1, idx2, inv1, inv2;
+  int limit = CalculateIndicesFull(puzzle, &idx1, &idx2, &inv1, &inv2);
   int nextLimit = 999;
 
   int blankIndex = GetBlankPosition(puzzle);
 
   if (limit > 0)
   {
-    while(0 == (length = ExamineNode(puzzle, lookupTable,
+    while(0 == (length = ExamineNode(puzzle,
                       blankIndex, -1 /* prevBlankIndex */, 
+                      idx1, idx2, inv1, inv2,
                       0 /* Starting length */, limit, 
                       &nextLimit, &nodesAtLimit)))
     {
@@ -581,6 +749,7 @@ int IDAStar(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE])
       limit = nextLimit;
       nextLimit = 999;
     }
+    printf("\n\nLimit: %d halted at %llu nodes\n", limit, nodesAtLimit);      
 
     nodesTotal += nodesAtLimit;
   }
@@ -742,13 +911,13 @@ void ReadPuzzleFromInput(int* puzzle)
 int main()
 {
   int puzzle[PUZZLE_SIZE];
-  int mdLookup[PUZZLE_SIZE][PUZZLE_SIZE];
+  int idx1, idx2, inv1, inv2;
 
   Simulation();
 
   ReadPuzzleFromInput(puzzle);
 
-  printf("Initial heuristic value of %d\n\n", CalculateValue(puzzle, mdLookup));
+  printf("Initial heuristic value of %d\n\n", CalculateIndicesFull(puzzle, &idx1, &idx2, &inv1, &inv2));
 
-  IDAStar(puzzle, mdLookup);
+  IDAStar(puzzle);
  }

@@ -65,7 +65,7 @@ int GetBlankPosition(int puzzle[PUZZLE_SIZE])
 //    Horizontal move = blank [+|-] 1.  Vertical move = blank [+|-] PUZZLE_COLUMN.
 //    Invalid move = -1.
 
-int GenerateAllowableMovesLookup(char amLookup[PUZZLE_SIZE][DIRECTIONS])
+int GenerateAllowableMovesLookup(int amLookup[PUZZLE_SIZE][DIRECTIONS])
 {
   int currentPosition;
   int currentDirection;
@@ -173,7 +173,7 @@ int GenerateAllowableMovesLookup(char amLookup[PUZZLE_SIZE][DIRECTIONS])
 //  Second index: The position of the tile.
 //  Value: Manhattan Distance for that tile.
 
-int GenerateManhattanDistanceLookup(char lookupTable[][PUZZLE_SIZE])
+int GenerateManhattanDistanceLookup(int lookupTable[][PUZZLE_SIZE])
 {
   int currentTile = 0;
   int currentPosition = 0;
@@ -222,7 +222,7 @@ int GenerateManhattanDistanceLookup(char lookupTable[][PUZZLE_SIZE])
 //  Print the lookup table to stdout
 //
 
-void PrintLookupTable(char lookupTable[][PUZZLE_SIZE])
+void PrintLookupTable(int lookupTable[][PUZZLE_SIZE])
 {
   int printColumn = 0,
       printRow = 0,
@@ -275,7 +275,7 @@ void PrintPuzzle(int puzzle[PUZZLE_SIZE])
 //
 //  Calculate value of given puzzle, using the given lookup table
 
-int CalculateValue(int* puzzle, char lookupTable[][PUZZLE_SIZE])
+int CalculateValue(int* puzzle, int lookupTable[][PUZZLE_SIZE])
 {
   int sum = 0;
 
@@ -291,7 +291,7 @@ int CalculateValue(int* puzzle, char lookupTable[][PUZZLE_SIZE])
 //
 //  Examine a node and recursively call self to search deeper in the tree
 
-int ExamineNode(int puzzle[PUZZLE_SIZE], char amLookup[PUZZLE_SIZE][DIRECTIONS], char mdLookup[][PUZZLE_SIZE],
+int ExamineNode(int puzzle[PUZZLE_SIZE], int amLookup[PUZZLE_SIZE][DIRECTIONS], int mdLookup[][PUZZLE_SIZE],
   int currentBlankIndex, int prevBlankIndex,
   int currentLength, int limitLength, int *nextLimit, unsigned long long *nodeCounter)
 {
@@ -386,7 +386,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], char amLookup[PUZZLE_SIZE][DIRECTIONS],
 //  Execute the IDA* algorithm on the given puzzle state with given lookup table
 //  for calculating heuristic.
 //
-int IDAStar(int puzzle[PUZZLE_SIZE], char amLookup[PUZZLE_SIZE][DIRECTIONS],char mdLookup[][PUZZLE_SIZE])
+int IDAStar(int puzzle[PUZZLE_SIZE], int amLookup[PUZZLE_SIZE][DIRECTIONS],int mdLookup[][PUZZLE_SIZE])
 {
   unsigned long long nodesTotal=0;
   unsigned long long nodesAtLimit = 0;
@@ -571,8 +571,8 @@ void ReadPuzzleFromInput(int* puzzle)
 int main()
 {
   int puzzle[PUZZLE_SIZE];
-  char amLookup[PUZZLE_SIZE][DIRECTIONS];
-  char mdLookup[PUZZLE_SIZE][PUZZLE_SIZE];
+  int amLookup[PUZZLE_SIZE][DIRECTIONS];
+  int mdLookup[PUZZLE_SIZE][PUZZLE_SIZE];
 
   GenerateAllowableMovesLookup(amLookup);
   GenerateManhattanDistanceLookup(mdLookup);

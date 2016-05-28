@@ -204,6 +204,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
   if (val == 0)
   {
     // Problem solved!
+    printf("\nTile movements to arrive in this state:\n");
     return currentLength;
   }
   else if (currentLength + val > limitLength)
@@ -300,6 +301,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
       // Did the child find anything?
       if (ret != 0)
       {
+        printf(" %d", puzzle[childBlankIndex]);
         return ret;
       }
     }
@@ -343,7 +345,7 @@ int IDAStar(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE])
     nodesTotal += nodesAtLimit;
   }
 
-  printf("Solution of length %d found after searching %llu nodes\n", length, nodesTotal);
+  printf("\n\nSolution of length %d found after searching %llu nodes\n", length, nodesTotal);
 }
 
 /////////////////////////////////////////////////////////////////////////////

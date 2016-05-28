@@ -424,6 +424,12 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
 
   (*nodeCounter)++;
 
+  if (((*nodeCounter) % 100000000) == 0)
+  {
+    // Status update every hundred million nodes
+    printf("Limit: %d ongoing - with %llu nodes\n", limitLength, *nodeCounter);
+  }  
+
   if(puzzle[currentBlankIndex]!=0)
   {
     printf("ERROR: Blank index is not blank.\n");
@@ -438,6 +444,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
   if (val == 0)
   {
     // Problem solved!
+    printf("\nTile movements to arrive in this state:\n");
     return currentLength;
   }
   else if (currentLength + val > limitLength)
@@ -534,6 +541,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE],
       // Did the child find anything?
       if (ret != 0)
       {
+        printf(" %d", puzzle[childBlankIndex]);
         return ret;
       }
     }
@@ -561,26 +569,23 @@ int IDAStar(int puzzle[PUZZLE_SIZE], int lookupTable[][PUZZLE_SIZE])
 
   if (limit > 0)
   {
-    printf("Limit: %d ", limit);
     while(0 == (length = ExamineNode(puzzle, lookupTable,
                       blankIndex, -1 /* prevBlankIndex */, 
                       0 /* Starting length */, limit, 
                       &nextLimit, &nodesAtLimit)))
     {
-      printf(" %llu nodes\n", nodesAtLimit);
+      printf("Limit: %d completed with %llu nodes\n", limit, nodesAtLimit);      
       nodesTotal += nodesAtLimit;
       length = 0;
       nodesAtLimit = 0;
       limit = nextLimit;
       nextLimit = 999;
-      printf("Limit: %d ", limit);
     }
-    printf(" %llu nodes\n", nodesAtLimit);
 
     nodesTotal += nodesAtLimit;
   }
 
-  printf("Solution of length %d found after searching %llu nodes\n", length, nodesTotal);
+  printf("\n\nSolution of length %d found after searching %llu nodes\n", length, nodesTotal);
 }
 
 /////////////////////////////////////////////////////////////////////////////

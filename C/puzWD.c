@@ -98,67 +98,111 @@ int CONV[PUZZLE_SIZE] = {
   4, 8,12
 };
 
+/////////////////////////////////////////////////////////////////////////////
+//
+// Pack the TABLE array (each element represented by 3 bits) into a 48-bit 
+// representation.
 
-void WriteTable(char count, int vect, int group)
+u64 PackTable()
 {
-  int i,j,k;
-  u64 table;
+  u64 packedValue = 0;
 
-  // Pack the TABLE array (each element represented by 3 bits) into a 48-bit 
-  // representation.
-  table = 0;
-  for (i=0; i<BOARD_WIDTH; i++)
+  for (int i=0; i<BOARD_WIDTH; i++)
   {
-    for (j=0; j<BOARD_WIDTH; j++)
+    for (int j=0; j<BOARD_WIDTH; j++)
     {
-      table = (table << 3) | TABLE[i][j];
+      packedValue = (packedValue << 3) | TABLE[i][j];
     }
   }
 
-  // Examine the WDPTN table to see if this TABLE configuration is already
-  // represented.
-  for (i=0; i<WDEND; i++)
-  {
-    if (WDPTN[i] == table)
-    {
-      break;
-    }
-  }
-
-  // At this point, if i < WDEND, we found an existing entry in the table
-  // matching our TABLE[i][j] value. If i==WDEND we hit the end without
-  // find it and would need to add it to the table.
-  if (i==WDEND)
-  {
-    WDPTN[WDEND] = table; // Representing a TABLE configuration.
-    WDTBL[WDEND] = count; // The Walking Distance for this TABLE configuration.
-    WDEND++;
-
-    // When a new entry is added, we also initialize the corresponding
-    // transition lookup entry for this TABLE configuration.
-    for (j=0;j<2;j++)
-    {
-      for (k=0;k<4;k++)
-      {
-        WDLNK[i][j][k] = WDTBL_SIZE;
-      }
-    }
-  }
-
-  // Fill in the transition lookup table entry for transition between the
-  // currently examined node (WDTOP-1) and this new node.
-  j = WDTOP - 1;
-  WDLNK[j][vect  ][group] = (short)i;
-  WDLNK[i][vect^1][group] = (short)j; // (vect) XOR (0x1) ==> flips the LSB on vect.
+  return packedValue;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+//
+// Initialize the link table entry at the given index to the starting value
+// of WDTBL_SIZE
+
+void InitializeLink(int linkIndex)
+{
+  for (int j=0;j<2;j++)
+  {
+    for (int k=0;k<4;k++)
+    {
+      WDLNK[linkIndex][j][k] = WDTBL_SIZE;
+    }
+  }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// 
+//  Given a tile index and a space index, explore all the possible swaps
+//  between those and record valid states into the lookup tables.
+
+void SwapAndWrite(int tileIndex, int spaceIndex, int walkingDistance, int direction)
+{
+  u64 packedTable;
+  int tableIndex;
+
+  for (int group=0; group<4; group++)
+  {
+    // Check if there's even a tile of the appropriate class to swap with
+    if (TABLE[tileIndex][group])
+    {
+      // Swap that tile with the space
+      TABLE[tileIndex][group]--;
+      TABLE[spaceIndex][group]++;
+
+      packedTable = PackTable();
+
+      // Examine the WDPTN table to see if this TABLE configuration is already
+      // represented.
+      for (tableIndex=0; tableIndex<WDEND; tableIndex++)
+      {
+        if (WDPTN[tableIndex] == packedTable)
+        {
+          break;
+        }
+      }
+
+      // At this point, if i < WDEND, we found an existing entry in the table
+      // matching our packed table value. If i==WDEND we hit the end without
+      // find it and would need to add it to the table.
+      if (tableIndex==WDEND)
+      {
+        WDPTN[WDEND] = packedTable; // Representing a TABLE configuration.
+        WDTBL[WDEND] = walkingDistance; // The Walking Distance for this TABLE configuration.
+        WDEND++;
+
+        // When a new entry is added, we also initialize the corresponding
+        // transition lookup entry for this TABLE configuration.
+        InitializeLink(tableIndex);
+      }
+
+      // Fill in the transition lookup table entry for transition between the
+      // currently examined node (WDTOP-1) and this new node. First fill in 
+      // the given direction, then flip the direction with the ^ (XOR) operator
+      // and fill in the other way.
+      WDLNK[WDTOP - 1 ][direction  ][group] = (short)tableIndex;
+      WDLNK[tableIndex][direction^1][group] = (short)WDTOP-1; 
+
+      // Revert the swap so we can look at the next candidate.
+      TABLE[tileIndex][group]++;
+      TABLE[spaceIndex][group]--;
+    }
+  }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//
 // Breadth-first walk through the Walking Distance space to generate all the
 // lookup data used in the heuristic search later on.
+
 void GenerateWalkingDistanceLookup()
 {
   int i,j,k,space=0,piece;
-  char count;
-  u64 table;
+  char walkingDistance;
+  u64 packedTable;
 
   // The breadth-first search begins with the solved puzzle state and expands
   // from there to the full Walking Distance table configurations.
@@ -175,28 +219,15 @@ void GenerateWalkingDistanceLookup()
   TABLE[3][3] = 3;
 
   // Encode TABLE to its 48-bit representation
-  table = 0;
-  for (i=0; i<4; i++)
-  {
-    for (j=0; j<4; j++)
-    {
-      table = (table << 3) | TABLE[i][j];
-    }
-  }
+  packedTable = PackTable();
 
   // The solved state and its representation sits at the beginning of the
   // Walking Distance lookup table.
-  WDPTN[0] = table; // Representing the solved TABLE configuration
-  WDTBL[0] = 0;     // Solved state has walking distance of zero.
+  WDPTN[0] = packedTable; // Representing the solved TABLE configuration
+  WDTBL[0] = 0;           // Solved state has walking distance of zero.
 
   // Initialize the transition lookup entry for the solved state.
-  for (j=0; j<2; j++)
-  {
-    for (k=0; k<4; k++)
-    {
-      WDLNK[0][j][k] = WDTBL_SIZE;
-    }
-  }
+  InitializeLink(0);
 
   // With the start state initialized to the solved configuration, it is
   // time to explore all the possible changes from that point.
@@ -206,10 +237,9 @@ void GenerateWalkingDistanceLookup()
   {
     // Retrieve the TABLE representation pattern and the Walking Distance
     // count for the node to be expanded.
-    table = WDPTN[WDTOP];
-    count = WDTBL[WDTOP];
+    packedTable = WDPTN[WDTOP];
+    walkingDistance = WDTBL[WDTOP] + 1;
     WDTOP++;
-    count++;
 
     // Unpack the representation back into the TABLE array so we can 
     // use it to explore valid states.
@@ -218,8 +248,8 @@ void GenerateWalkingDistanceLookup()
       piece = 0; // This tracks the number of tile pieces on this row
       for (j=3; j>=0; j--)
       {
-        TABLE[i][j] = (int)(table&7);
-        table >>= 3;
+        TABLE[i][j] = (int)(packedTable&7);
+        packedTable >>= 3;
         piece += TABLE[i][j];
       }
       if (piece==3)
@@ -229,54 +259,18 @@ void GenerateWalkingDistanceLookup()
       }
     }
 
-    // Is the space on the bottom-most row?
+    // If the space is not on the bottom-most row, explore the states that
+    // involve moving a tile up into the space.
     if ((piece = space + 1) < 4)
     {
-      // Not on the bottom-most row, so we'll explore the four possible 
-      // classes of tiles that might be on a lower row, and move it up.
-      for (i=0; i<4; i++)
-      {
-        // Check if there's even a tile of the appropriate class to move up
-        if (TABLE[piece][i])
-        {
-          // Swap that tile with the space
-          TABLE[piece][i]--;
-          TABLE[space][i]++;
-
-          // Record this TABLE configuration, add it to the open list, and
-          // also record the transition of this swap.
-          WriteTable(count, 0, i);
-
-          // Revert the swap so we can look at the next candidate.
-          TABLE[piece][i]++;
-          TABLE[space][i]--;
-        }
-      }
+      SwapAndWrite(piece, space, walkingDistance, 0);
     }
 
-    // Is the space on the top row?
+    // If the space is not on the top-most row, explore the states that
+    // involve moving a tile down into the space.
     if ((piece = space - 1) >= 0)
     {
-      // Not on the top row. So we'll explore the four possible classes of
-      // tiles that might be on a higher row, and move it down.
-      for (i=0; i<4; i++)
-      {
-        // Check if there's even a tile of the appropriate class to move up
-        if (TABLE[piece][i])
-        {
-          // Swap that tile with the space
-          TABLE[piece][i]--;
-          TABLE[space][i]++;
-
-          // Record this TABLE configuration, add it to the open list, and
-          // also record the transition of this swap.
-          WriteTable(count, 1, i);
-
-          // Revert the swap so we can look at the next candidate.
-          TABLE[piece][i]++;
-          TABLE[space][i]--;
-        }
-      }
+      SwapAndWrite(piece, space, walkingDistance, 1);
     }
   }
 
@@ -347,6 +341,23 @@ void PrintPuzzle(int puzzle[PUZZLE_SIZE])
 
 /////////////////////////////////////////////////////////////////////////////
 //
+//  Given the full set of indices, calculate the lower bound value to use
+//  as heuristic for the IDA* search.
+
+int CalculateValue(int idxV, int idxH, int invV, int invH)
+{
+  int wdV = WDTBL[idxV]; // Walking Distance for vertical tile movements.
+  int wdH = WDTBL[idxH]; // Walking Distance for horizontal tile movements.
+  int idV = IDTBL[invV]; // Inversion Distance for vertical tile movements.
+  int idH = IDTBL[invH]; // Inversion Distance for horizontal tile movements.
+  int lowbV = (wdV>idV)? wdV:idV; // Maximum of WD or ID is the lower bound.
+  int lowbH = (wdH>idH)? wdH:idH; // Maximum of WD or ID is the lower bound.
+
+  return lowbV + lowbH;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//
 //  The full set of Walking Distance calculations. This is required for the
 //  initial state of the search. After startup, as we search the problem tree,
 //  the WDLNK array can take care of updating the walking distance from step
@@ -358,9 +369,8 @@ void PrintPuzzle(int puzzle[PUZZLE_SIZE])
 
 int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *pinv2)
 {
-  int i, j, num1, num2, wd1, wd2, id1, id2;
+  int i, j, num1, num2;
   int idx1, idx2, inv1, inv2;
-  int lowb1,lowb2;
   u64 table;
 
   int work[PUZZLE_COLUMN];
@@ -495,21 +505,13 @@ int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *p
     }
   }
 
-  // Put it all together for the heuristic value
-  wd1 = WDTBL[idx1]; // Walking Distance for vertical tile movements.
-  wd2 = WDTBL[idx2]; // Walking Distance for horizontal tile movements.
-  id1 = IDTBL[inv1]; // Inversion Distance for vertical tile movements.
-  id2 = IDTBL[inv2]; // Inversion Distance for horizontal tile movements.
-  lowb1 = (wd1>id1)? wd1:id1; // Maximum of WD or ID is the lower bound.
-  lowb2 = (wd2>id2)? wd2:id2; // Maximum of WD or ID is the lower bound.
-
   // Copy values to outparams.
   *pidx1 = idx1;
   *pidx2 = idx2;
   *pinv1 = inv1;
   *pinv2 = inv2;
 
-  return lowb1+lowb2; // Horizontal + Vertical lower bounds = total lower bound
+  return CalculateValue(idx1, idx2, inv1, inv2);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -519,10 +521,9 @@ int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *p
 int ExamineNode(int puzzle[PUZZLE_SIZE],
   int currentBlankIndex, int prevBlankIndex,
   int idx1o, int idx2o, int inv1o, int inv2o,
-  int currentLength, int limitLength, int *nextLimit, unsigned long long *nodeCounter)
+  int currentLength, int limitLength, unsigned long long *nodeCounter)
 {
-  int val;
-  int fallback = 0;
+  int val = CalculateValue(idx1o, idx2o, inv1o, inv2o);;
 
   (*nodeCounter)++;
 
@@ -537,21 +538,6 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
     printf("ERROR: Blank index is not blank.\n");
   }
 
-  int idx1 = idx1o;
-  int idx2 = idx2o;
-  int inv1 = inv1o;
-  int inv2 = inv2o;
-
-  // Calculate the value of 'this' node.
-  int wd1 = WDTBL[idx1];
-  int wd2 = WDTBL[idx2];
-  int id1 = IDTBL[inv1];
-  int id2 = IDTBL[inv2];
-  int lowb1 = (wd1 > id1) ? wd1 : id1;
-  int lowb2 = (wd2 > id2) ? wd2 : id2;
-
-  val = lowb1 + lowb2;
-
   if (val == 0)
   {
     // Problem solved!
@@ -561,22 +547,19 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
   else if (currentLength + val > limitLength)
   {
     // Exceeded limit
-    if (*nextLimit > currentLength+val)
-    {
-      // Nominate our length+heuristic value as next highest limit
-      *nextLimit = currentLength+val;
-    }
     return 0;
   }
   else
   {
     // Not terminating, so let's dig deeper
     int row=0, col=0, ret=0, childBlankIndex=0;
+    int idx1, idx2, inv1, inv2;
 
     GetColumnRow(currentBlankIndex, &col, &row);
 
     for (int i = 0; i < 4; i++)
     {
+      // Reset indices between iterations
       idx1 = idx1o;
       idx2 = idx2o;
       inv1 = inv1o;
@@ -594,6 +577,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
         {
           childBlankIndex = currentBlankIndex - PUZZLE_COLUMN;
 
+          // Update inversion count for this move.
           for (int j = childBlankIndex+1; j < currentBlankIndex; j++)
           {
             if (puzzle[j] > puzzle[childBlankIndex])
@@ -606,6 +590,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
             }
           }
 
+          // Look up the new Walking Distance index for this move.
           idx1 = WDLNK[idx1][1][(puzzle[childBlankIndex]-1)>>2];
         }
       }
@@ -621,7 +606,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
         {
           childBlankIndex = currentBlankIndex + PUZZLE_COLUMN;
 
-          // Scan the tiles between space and tile to update inversion count
+          // Update inversion count for this move.
           for (int j = currentBlankIndex+1; j < childBlankIndex; j++)
           {
             if (puzzle[j] > puzzle[childBlankIndex])
@@ -634,7 +619,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
             }
           }
 
-          // Use the link table to update the index corresponding to the moved tile.
+          // Look up the new Walking Distance index for this move.
           idx1 = WDLNK[idx1][0][(puzzle[childBlankIndex]-1)>>2];
         }
       }
@@ -652,6 +637,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
 
           int convTile = CONV[puzzle[childBlankIndex]];
 
+          // Update inversion count for this move.
           for (int j = childBlankIndex + PUZZLE_COLUMN; j < PUZZLE_SIZE; j+= PUZZLE_COLUMN)
           {
             if (CONV[puzzle[j]] > convTile)
@@ -676,6 +662,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
             }
           }
 
+          // Look up the new Walking Distance index for this move.
           idx2 = WDLNK[idx2][1][(convTile-1)>>2];
         }
       }
@@ -693,6 +680,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
 
           int convTile = CONV[puzzle[childBlankIndex]];
 
+          // Update inversion count for this move.
           for (int j = currentBlankIndex+PUZZLE_COLUMN; j < PUZZLE_SIZE; j += PUZZLE_COLUMN)
           {
             if (CONV[puzzle[j]] > convTile)
@@ -717,6 +705,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
             }
           }
 
+          // Look up the new Walking Distance index for this move.
           idx2 = WDLNK[idx2][0][(convTile-1) >> 2];
         }
       }
@@ -735,7 +724,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
       ret = ExamineNode(puzzle, 
         childBlankIndex, currentBlankIndex,
         idx1, idx2, inv1, inv2,
-        currentLength+1, limitLength, nextLimit, nodeCounter);
+        currentLength+1, limitLength, nodeCounter);
 
       // Revert the swap
       puzzle[childBlankIndex] = puzzle[currentBlankIndex];
@@ -767,7 +756,6 @@ int IDAStar(int puzzle[PUZZLE_SIZE])
   int length = 0;
   int idx1, idx2, inv1, inv2;
   int limit = CalculateIndicesFull(puzzle, &idx1, &idx2, &inv1, &inv2);
-  int nextLimit = 999;
 
   int blankIndex = GetBlankPosition(puzzle);
 
@@ -777,14 +765,13 @@ int IDAStar(int puzzle[PUZZLE_SIZE])
                       blankIndex, -1 /* prevBlankIndex */, 
                       idx1, idx2, inv1, inv2,
                       0 /* Starting length */, limit, 
-                      &nextLimit, &nodesAtLimit)))
+                      &nodesAtLimit)))
     {
       printf("Limit: %d completed with %llu nodes\n", limit, nodesAtLimit);      
       nodesTotal += nodesAtLimit;
       length = 0;
       nodesAtLimit = 0;
-      limit = nextLimit;
-      nextLimit = 999;
+      limit += 2;
     }
     printf("\n\nLimit: %d halted at %llu nodes\n", limit, nodesAtLimit);      
 
@@ -911,7 +898,7 @@ int Valid(int* puzzle)
 
 void ReadPuzzleFromInput(int* puzzle)
 {
-  int i;
+  int i, j;
 
   // printf("15-Puzzle solver\n\n");
   // printf("Here are the tile position indices:\n\n");
@@ -930,7 +917,15 @@ void ReadPuzzleFromInput(int* puzzle)
 
     for(i = 0; i < PUZZLE_SIZE; i++)
     {
-      scanf("%d", &puzzle[i]);
+      j = scanf("%d", &puzzle[i]);
+      if(j==EOF)
+      {
+        break;
+      }
+      else if (j != 1)
+      {
+        printf("ERROR: Expected 1 input, got %d\n", j);
+      }
     }
 
     printf("\nThe input received were as follows:\n\n");

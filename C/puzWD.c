@@ -100,22 +100,19 @@ void WriteTable(char count, int vect, int group)
   int i,j,k;
   u64 table;
 
-  // GT: "Find the same pattern"
+  // Pack the TABLE array (each element represented by 3 bits) into a 48-bit 
+  // representation.
   table = 0;
-  for (i=0; i<4; i++)
+  for (i=0; i<BOARD_WIDTH; i++)
   {
-    for (j=0; j<4; j++)
+    for (j=0; j<BOARD_WIDTH; j++)
     {
-      // TABLE is a 4x4 array like the game board.
-      // TABLE[i][j] is something that can be represented in 3 bits (0-7) and
-      // we're packing that into (16*3) = 48 bits, storing in a 64-bit value
-      // 'table'
-      table = (table <<3) | TABLE[i][j];
+      table = (table << 3) | TABLE[i][j];
     }
   }
 
-  // Scan values of the WDPTN table.
-  // WDEND represents the index of the first unused entry in the table.
+  // Examine the WDPTN table to see if this TABLE configuration is already
+  // represented.
   for (i=0; i<WDEND; i++)
   {
     if (WDPTN[i] == table)
@@ -126,14 +123,15 @@ void WriteTable(char count, int vect, int group)
 
   // At this point, if i < WDEND, we found an existing entry in the table
   // matching our TABLE[i][j] value. If i==WDEND we hit the end without
-  // find it.
-
-  // GT: "New pattern registration"
+  // find it and would need to add it to the table.
   if (i==WDEND)
   {
-    WDPTN[WDEND] = table;
-    WDTBL[WDEND] = count;
+    WDPTN[WDEND] = table; // Representing a TABLE configuration.
+    WDTBL[WDEND] = count; // The Walking Distance for this TABLE configuration.
     WDEND++;
+
+    // When a new entry is added, we also initialize the corresponding
+    // transition lookup entry for this TABLE configuration.
     for (j=0;j<2;j++)
     {
       for (k=0;k<4;k++)
@@ -143,20 +141,25 @@ void WriteTable(char count, int vect, int group)
     }
   }
 
-  // GT: "To form a bidirection link"
+  // Fill in the transition lookup table entry for transition between the
+  // currently examined node (WDTOP-1) and this new node.
   j = WDTOP - 1;
   WDLNK[j][vect  ][group] = (short)i;
-  WDLNK[i][vect^1][group] = (short)j; // (vect) XOR (0x1) == flips the LSB on vect.
+  WDLNK[i][vect^1][group] = (short)j; // (vect) XOR (0x1) ==> flips the LSB on vect.
 }
 
-// GT: "Seek WalkingDistance in the breadth-first search"
-void Simulation()
+// Breadth-first walk through the Walking Distance space to generate all the
+// lookup data used in the heuristic search later on.
+void GenerateWalkingDistanceLookup()
 {
   int i,j,k,space=0,piece;
   char count;
   u64 table;
 
-  // GT: "Make the initial surface"
+  // The breadth-first search begins with the solved puzzle state and expands
+  // from there to the full Walking Distance table configurations.
+
+  // Create TABLE representing the solved state
   for (i=0; i<4; i++)
   {
     for (j=0; j<4; j++)
@@ -166,6 +169,8 @@ void Simulation()
   }
   TABLE[0][0] = TABLE[1][1] = TABLE[2][2] = 4;
   TABLE[3][3] = 3;
+
+  // Encode TABLE to its 48-bit representation
   table = 0;
   for (i=0; i<4; i++)
   {
@@ -175,9 +180,12 @@ void Simulation()
     }
   }
 
-  // GT: "Register the initial surface"
-  WDPTN[0] = table;
-  WDTBL[0] = 0;
+  // The solved state and its representation sits at the beginning of the
+  // Walking Distance lookup table.
+  WDPTN[0] = table; // Representing the solved TABLE configuration
+  WDTBL[0] = 0;     // Solved state has walking distance of zero.
+
+  // Initialize the transition lookup entry for the solved state.
   for (j=0; j<2; j++)
   {
     for (k=0; k<4; k++)
@@ -186,25 +194,24 @@ void Simulation()
     }
   }
 
-  // GT: "Breadth-first search"
-  WDTOP=0;
-  WDEND=1;
+  // With the start state initialized to the solved configuration, it is
+  // time to explore all the possible changes from that point.
+  WDTOP=0; // Index of the node currently being expanded (the solved state)
+  WDEND=1; // End of the open list where we append new nodes.
   while (WDTOP < WDEND)
   {
-    // GT: "TABLE[] call"
+    // Retrieve the TABLE representation pattern and the Walking Distance
+    // count for the node to be expanded.
     table = WDPTN[WDTOP];
     count = WDTBL[WDTOP];
     WDTOP++;
     count++;
 
-    // GT: "Reproduction" (Also: reappearance/return/revival)
-
-    // Looks like taking the 'table' value and decoding it to the 4x4 TABLE
-    //  Also sets 'space' to a value indicating [row?] of space.
-    //  But what's going with 'piece'?
+    // Unpack the representation back into the TABLE array so we can 
+    // use it to explore valid states.
     for (i=3; i>=0; i--)
     {
-      piece = 0;
+      piece = 0; // This tracks the number of tile pieces on this row
       for (j=3; j>=0; j--)
       {
         TABLE[i][j] = (int)(table&7);
@@ -213,36 +220,55 @@ void Simulation()
       }
       if (piece==3)
       {
+        // Only three tiles live on this row - so the blank space is here.
         space = i;
       }
     }
 
-    // GT: "0: Move the piece to the top"
+    // Is the space on the bottom-most row?
     if ((piece = space + 1) < 4)
     {
+      // Not on the bottom-most row, so we'll explore the four possible 
+      // classes of tiles that might be on a lower row, and move it up.
       for (i=0; i<4; i++)
       {
+        // Check if there's even a tile of the appropriate class to move up
         if (TABLE[piece][i])
         {
+          // Swap that tile with the space
           TABLE[piece][i]--;
           TABLE[space][i]++;
+
+          // Record this TABLE configuration, add it to the open list, and
+          // also record the transition of this swap.
           WriteTable(count, 0, i);
+
+          // Revert the swap so we can look at the next candidate.
           TABLE[piece][i]++;
           TABLE[space][i]--;
         }
       }
     }
 
-    // GT: "1: Move the piece down"
+    // Is the space on the top row?
     if ((piece = space - 1) >= 0)
     {
+      // Not on the top row. So we'll explore the four possible classes of
+      // tiles that might be on a higher row, and move it down.
       for (i=0; i<4; i++)
       {
+        // Check if there's even a tile of the appropriate class to move up
         if (TABLE[piece][i])
         {
+          // Swap that tile with the space
           TABLE[piece][i]--;
           TABLE[space][i]++;
+
+          // Record this TABLE configuration, add it to the open list, and
+          // also record the transition of this swap.
           WriteTable(count, 1, i);
+
+          // Revert the swap so we can look at the next candidate.
           TABLE[piece][i]++;
           TABLE[space][i]--;
         }
@@ -251,12 +277,12 @@ void Simulation()
   }
 
   ///////////////////////////////////////////////////////////////////////////
+
+  // TODO: Informative comment as soon as I understand what this is...
   for (i=0; i<IDTBL_SIZE; i++)
   {
     IDTBL[i] = (char)((i/3) + (i%3));
   }
-
-  printf("Lookup table completed with WDTOP=%d, WDEND=%d\n", WDTOP, WDEND);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -315,7 +341,13 @@ void PrintPuzzle(int puzzle[PUZZLE_SIZE])
 
 /////////////////////////////////////////////////////////////////////////////
 //
-//  Calculate heuristic value of given puzzle
+//  The full set of Walking Distance calculations. This is required for the
+//  initial state of the search. After startup, as we search the problem tree,
+//  the WDLNK array should take care of updating the walking distance.
+//
+//  Debug note: If we suspect the WDLNK update mechanism is broken, we can 
+//  fall back to performing this full calculation. But it is not recommended,
+//  it is extremely computationally expensive to do this for each tree node.
 
 int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *pinv2)
 {
@@ -364,12 +396,7 @@ int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *p
       table = (table<<3) | work[j];
     }
   }
-  for (idx1=0; WDPTN[idx1] != table && idx1 < WDTBL_SIZE; idx1++);
-
-  if(idx1 >= WDTBL_SIZE)
-  {
-    printf("WARNING: search for idx1 has ran off the rails. Debugger time!");
-  }
+  for (idx1=0; WDPTN[idx1] != table; idx1++);
 
   // Calculate IDX2
   table = 0;
@@ -401,12 +428,7 @@ int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *p
       table = (table<<3) | work[j];
     }
   }
-  for (idx2=0; WDPTN[idx2] != table && idx2 < WDTBL_SIZE; idx2++);
-
-  if(idx2 >= WDTBL_SIZE)
-  {
-    printf("WARNING: search for idx2 has ran off the rails. Debugger time!");
-  }
+  for (idx2=0; WDPTN[idx2] != table; idx2++);
 
   // Calculate inv1
   inv1 = 0;
@@ -456,7 +478,6 @@ int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *p
   id2 = IDTBL[inv2];
   lowb1 = (wd1>id1)? wd1:id1;
   lowb2 = (wd2>id2)? wd2:id2;
-  // printf("(WD=%d/%d, ID=%d/%d) LowerBound=%d\n", wd1, wd2, id1, id2, lowb1+lowb2);
 
   *pidx1 = idx1;
   *pidx2 = idx2;
@@ -903,7 +924,7 @@ int main()
   int puzzle[PUZZLE_SIZE];
   int idx1, idx2, inv1, inv2;
 
-  Simulation();
+  GenerateWalkingDistanceLookup();
 
   ReadPuzzleFromInput(puzzle);
 

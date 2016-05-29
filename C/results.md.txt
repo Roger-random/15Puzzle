@@ -1,4 +1,5 @@
-roger@Roger-Z87G41:~/Git/15Puzzle/C$ time ./a.out < test.md38-1.txt
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 
 Generating Manhattan Distance lookup table
 Enter the starting configuration for the puzzle:
@@ -27,8 +28,107 @@ real	0m4.091s
 user	0m4.088s
 sys	0m0.000s
 
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 
-roger@Roger-Z87G41:~/Git/15Puzzle/C$ time ./a.out < test.md80-1.txt 
+Generating Manhattan Distance lookup table
+Enter the starting configuration for the puzzle:
+
+The input received were as follows:
+
+ 15 11 12 13
+  3  2  9 14
+  0  4 10  5
+  8  7  6  1
+
+Initial Manhattan Distance value of 54
+
+Limit: 54 completed with 5 nodes
+Limit: 56 completed with 143 nodes
+Limit: 58 completed with 4240 nodes
+Limit: 60 completed with 87111 nodes
+Limit: 62 completed with 1320040 nodes
+Limit: 64 completed with 15934325 nodes
+Limit: 66 completed with 165553899 nodes
+
+Tile movements to arrive in this state:
+ 12 11 15 14 13 9 5 1 2 6 7 8 11 12 14 13 9 5 1 7 8 15 13 9 5 1 7 8 6 3 4 11 12 13 9 5 1 7 8 2 3 4 15 9 10 6 4 15 11 12 13 14 5 1 6 4 2 3 15 11 12 13 14 5 1 6 7 8
+
+Solution of length 68 found after searching 1135644141 nodes
+
+real  1m13.862s
+user  1m13.852s
+sys 0m0.000s
+
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
+Generating Manhattan Distance lookup table
+Enter the starting configuration for the puzzle:
+
+The input received were as follows:
+
+ 15 12  0 13
+  3 11  9 14
+  4  2 10  5
+  8  7  6  1
+
+Initial Manhattan Distance value of 56
+
+Limit: 56 completed with 13 nodes
+Limit: 58 completed with 758 nodes
+Limit: 60 completed with 15790 nodes
+Limit: 62 completed with 279048 nodes
+Limit: 64 completed with 3689749 nodes
+Limit: 66 completed with 41212474 nodes
+Limit: 68 completed with 409086791 nodes
+Limit: 70 completed with 3746890825 nodes
+
+Tile movements to arrive in this state:
+ 12 11 15 14 13 9 5 1 2 6 7 8 11 12 14 13 9 5 1 7 8 15 13 9 5 1 7 8 6 3 4 11 12 13 9 5 1 7 8 2 3 4 15 9 10 6 4 15 11 12 13 14 5 1 6 4 2 3 15 11 12 13 14 5 1 6 7 8 4 2 11 12
+
+Solution of length 72 found after searching 12760660843 nodes
+
+real  14m7.052s
+user  14m6.196s
+sys 0m0.088s
+
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
+Generating Manhattan Distance lookup table
+Enter the starting configuration for the puzzle:
+
+The input received were as follows:
+
+ 15 12  9 13
+  3 11 10 14
+  4  7  2  5
+  8  0  6  1
+
+Initial Manhattan Distance value of 58
+
+Limit: 58 completed with 8 nodes
+Limit: 60 completed with 537 nodes
+Limit: 62 completed with 11917 nodes
+Limit: 64 completed with 249683 nodes
+Limit: 66 completed with 4018023 nodes
+Limit: 68 completed with 51870662 nodes
+Limit: 70 completed with 582024958 nodes
+Limit: 72 completed with 5918667639 nodes
+Limit: 74 completed with 55854845248 nodes
+
+Tile movements to arrive in this state:
+ 12 11 15 14 13 9 5 1 2 6 7 8 11 12 14 13 9 5 1 7 8 15 13 9 5 1 7 8 6 3 4 11 12 13 9 5 1 7 8 2 3 4 15 9 10 6 4 15 11 12 13 14 5 1 6 4 2 3 15 11 12 13 14 5 1 6 7 8 4 2 11 12 9 10 2 7
+
+Solution of length 76 found after searching 214218278555 nodes
+
+real  345m19.180s
+user  237m3.356s
+sys 0m1.008s
+
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 
 Generating Manhattan Distance lookup table
 Enter the starting configuration for the puzzle:

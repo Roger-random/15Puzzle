@@ -79,7 +79,11 @@ char  WDTBL[WDTBL_SIZE];
 // steps of packing the TABLE and searching in WDPTN.
 short WDLNK[WDTBL_SIZE][2][BOARD_WIDTH];
 
-// Something to do with tile inversion distance...
+// Inversion Distance is another heuristic employed here. It tracks the number
+// of tiles that are out-of-place relative to tiles with a lower number.
+// In the solved state, all tile numbers are increasing and the inversion
+// distance is zero. IDTBL maps an inversion count to the minimum number of 
+// moves required to put tiles back in order.
 char  IDTBL[IDTBL_SIZE];
 
 // Walking Distance performs its calculations along one axis, then repeats
@@ -278,7 +282,9 @@ void GenerateWalkingDistanceLookup()
 
   ///////////////////////////////////////////////////////////////////////////
 
-  // TODO: Informative comment as soon as I understand what this is...
+  // The inversion count table maps the count of inversion along an axis (i)
+  // to the minimum number of moves that would be needed to fix the inversion
+  // so the tiles are in order.
   for (i=0; i<IDTBL_SIZE; i++)
   {
     IDTBL[i] = (char)((i/3) + (i%3));
@@ -343,7 +349,8 @@ void PrintPuzzle(int puzzle[PUZZLE_SIZE])
 //
 //  The full set of Walking Distance calculations. This is required for the
 //  initial state of the search. After startup, as we search the problem tree,
-//  the WDLNK array should take care of updating the walking distance.
+//  the WDLNK array can take care of updating the walking distance from step
+//  to step with far less computation involved.
 //
 //  Debug note: If we suspect the WDLNK update mechanism is broken, we can 
 //  fall back to performing this full calculation. But it is not recommended,
@@ -354,28 +361,33 @@ int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *p
   int i, j, num1, num2, wd1, wd2, id1, id2;
   int idx1, idx2, inv1, inv2;
   int lowb1,lowb2;
+  u64 table;
 
   int work[PUZZLE_COLUMN];
 
-  int convp[PUZZLE_SIZE] = { // Flips the board INDICES 90 degrees.
+  // For tile position index i, convp[i] will be the index of the position
+  // of the flipped-axis array.
+  int convp[PUZZLE_SIZE] = { 
     0, 4, 8,12, 
     1, 5, 9,13, 
     2, 6,10,14, 
     3, 7,11,15
   };
 
-  u64 table;
+  // Calculate IDX1 - index into the Walking Distance table corresponding to
+  // the minimum number of tile movements across rows. (Vertical tile moves.)
 
-  // Calculate IDX1
+  // Examine the table and pack representation into 'table' value.
   table = 0;
   for (i=0;i<PUZZLE_ROW;i++)
   {
-    // Initialize work array
+    // Zero out work array
     for (j=0; j<PUZZLE_COLUMN; j++)
     {
       work[j] = 0;
     }
 
+    // Look at each of the tiles in this row.
     for (j=0; j<PUZZLE_COLUMN; j++)
     {
       num1 = puzzle[i*PUZZLE_COLUMN + j];
@@ -396,19 +408,27 @@ int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *p
       table = (table<<3) | work[j];
     }
   }
+
+  // Look for index of the WDPTN entry corresponding to this pattern.
   for (idx1=0; WDPTN[idx1] != table; idx1++);
 
-  // Calculate IDX2
+  // Calculate IDX2 - repeat the calculation made for IDX1, but this time
+  // for movement across columns. (Horizontal tile moves.) We can use the
+  // same lookup table as that used for rows by swapping the axis in all 
+  // the lookup indices
+
+  // Again - pack the representation into 'table'
   table = 0;
-  for (i=0; i<PUZZLE_ROW; i++)
+  for (i=0; i<PUZZLE_COLUMN; i++)
   {
-    // Initialize work array
-    for (j=0; j<PUZZLE_COLUMN; j++)
+    // Zero out work array
+    for (j=0; j<PUZZLE_ROW; j++)
     {
       work[j] = 0;
     }
 
-    for (j=0; j<PUZZLE_COLUMN; j++)
+    // Look at each of the tiles in this column.
+    for (j=0; j<PUZZLE_ROW; j++)
     {
       num2 = CONV[puzzle[j*PUZZLE_ROW + i]];
       if (num2 == 0)
@@ -428,9 +448,11 @@ int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *p
       table = (table<<3) | work[j];
     }
   }
+
+  // Look for index of the WDPTN entry corresponding to this pattern.
   for (idx2=0; WDPTN[idx2] != table; idx2++);
 
-  // Calculate inv1
+  // Calculate inv1 - the number of tile inversions along the horizontal axis
   inv1 = 0;
   for (i=0; i<PUZZLE_SIZE; i++)
   {
@@ -451,7 +473,9 @@ int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *p
     }
   }
 
-  // Calculate inv2
+  // Calculate inv1 - the number of tile inversions along the vertical axis
+  // Code is much like above except for use of the CONV and convp lookup arrays
+  // to help us swap the axis.
   inv2 = 0;
   for (i=0; i<PUZZLE_SIZE; i++)
   {
@@ -471,20 +495,21 @@ int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *p
     }
   }
 
-  // Put it all together for the walking distance
-  wd1 = WDTBL[idx1];
-  wd2 = WDTBL[idx2];
-  id1 = IDTBL[inv1];
-  id2 = IDTBL[inv2];
-  lowb1 = (wd1>id1)? wd1:id1;
-  lowb2 = (wd2>id2)? wd2:id2;
+  // Put it all together for the heuristic value
+  wd1 = WDTBL[idx1]; // Walking Distance for vertical tile movements.
+  wd2 = WDTBL[idx2]; // Walking Distance for horizontal tile movements.
+  id1 = IDTBL[inv1]; // Inversion Distance for vertical tile movements.
+  id2 = IDTBL[inv2]; // Inversion Distance for horizontal tile movements.
+  lowb1 = (wd1>id1)? wd1:id1; // Maximum of WD or ID is the lower bound.
+  lowb2 = (wd2>id2)? wd2:id2; // Maximum of WD or ID is the lower bound.
 
+  // Copy values to outparams.
   *pidx1 = idx1;
   *pidx2 = idx2;
   *pinv1 = inv1;
   *pinv2 = inv2;
 
-  return lowb1+lowb2;
+  return lowb1+lowb2; // Horizontal + Vertical lower bounds = total lower bound
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -517,6 +542,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
   int inv1 = inv1o;
   int inv2 = inv2o;
 
+  // Calculate the value of 'this' node.
   int wd1 = WDTBL[idx1];
   int wd2 = WDTBL[idx2];
   int id1 = IDTBL[inv1];

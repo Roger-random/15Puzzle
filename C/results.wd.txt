@@ -28,8 +28,8 @@ Limit: 54 halted at 1100615 nodes
 
 Solution of length 54 found after searching 2055572 nodes
 
-real  0m2.430s
-user  0m2.428s
+real  0m0.494s
+user  0m0.492s
 sys 0m0.000s
 
 /////////////////////////////////////////////////////////////////////////////
@@ -60,8 +60,8 @@ Limit: 68 halted at 36264235 nodes
 
 Solution of length 68 found after searching 41905749 nodes
 
-real  0m6.468s
-user  0m6.432s
+real  0m1.314s
+user  0m1.312s
 sys 0m0.000s
 
 /////////////////////////////////////////////////////////////////////////////
@@ -94,8 +94,8 @@ Limit: 72 halted at 458778011 nodes
 
 Solution of length 72 found after searching 638940771 nodes
 
-real  0m42.776s
-user  0m42.740s
+real  0m13.700s
+user  0m13.696s
 sys 0m0.000s
 
 /////////////////////////////////////////////////////////////////////////////
@@ -118,16 +118,7 @@ Limit: 66 completed with 25547 nodes
 Limit: 68 completed with 679858 nodes
 Limit: 70 completed with 12815675 nodes
 Limit: 72 completed with 190485693 nodes
-Limit: 74 ongoing - with 1000000000 nodes
-Limit: 74 ongoing - with 2000000000 nodes
 Limit: 74 completed with 2386837429 nodes
-Limit: 76 ongoing - with 1000000000 nodes
-Limit: 76 ongoing - with 2000000000 nodes
-Limit: 76 ongoing - with 3000000000 nodes
-Limit: 76 ongoing - with 4000000000 nodes
-Limit: 76 ongoing - with 5000000000 nodes
-Limit: 76 ongoing - with 6000000000 nodes
-Limit: 76 ongoing - with 7000000000 nodes
 
 Tile movements to arrive in this state:
  12 11 15 14 13 9 5 1 2 6 7 8 11 12 14 13 9 5 1 7 8 15 13 9 5 1 7 8 6 3 4 11 12 13 9 5 1 7 8 2 3 4 15 9 10 6 4 15 11 12 13 14 5 1 6 4 2 3 15 11 12 13 14 5 1 6 7 8 4 2 11 12 9 10 2 7
@@ -137,9 +128,9 @@ Limit: 76 halted at 7912225372 nodes
 
 Solution of length 76 found after searching 10503070165 nodes
 
-real  10m4.314s
-user  10m4.276s
-sys 0m0.000s
+real  3m37.780s
+user  3m37.768s
+sys 0m0.004s
 
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
@@ -161,74 +152,8 @@ Limit: 68 completed with 65744 nodes
 Limit: 70 completed with 1482792 nodes
 Limit: 72 completed with 26171635 nodes
 Limit: 74 completed with 384362762 nodes
-Limit: 76 ongoing - with 1000000000 nodes
-Limit: 76 ongoing - with 2000000000 nodes
-Limit: 76 ongoing - with 3000000000 nodes
-Limit: 76 ongoing - with 4000000000 nodes
 Limit: 76 completed with 4899755017 nodes
-Limit: 78 ongoing - with 1000000000 nodes
-Limit: 78 ongoing - with 2000000000 nodes
-Limit: 78 ongoing - with 3000000000 nodes
-Limit: 78 ongoing - with 4000000000 nodes
-Limit: 78 ongoing - with 5000000000 nodes
-Limit: 78 ongoing - with 6000000000 nodes
-Limit: 78 ongoing - with 7000000000 nodes
-Limit: 78 ongoing - with 8000000000 nodes
-Limit: 78 ongoing - with 9000000000 nodes
-Limit: 78 ongoing - with 10000000000 nodes
-Limit: 78 ongoing - with 11000000000 nodes
-Limit: 78 ongoing - with 12000000000 nodes
-Limit: 78 ongoing - with 13000000000 nodes
-Limit: 78 ongoing - with 14000000000 nodes
-Limit: 78 ongoing - with 15000000000 nodes
-Limit: 78 ongoing - with 16000000000 nodes
-Limit: 78 ongoing - with 17000000000 nodes
-Limit: 78 ongoing - with 18000000000 nodes
-Limit: 78 ongoing - with 19000000000 nodes
-Limit: 78 ongoing - with 20000000000 nodes
-Limit: 78 ongoing - with 21000000000 nodes
-Limit: 78 ongoing - with 22000000000 nodes
-Limit: 78 ongoing - with 23000000000 nodes
-Limit: 78 ongoing - with 24000000000 nodes
-Limit: 78 ongoing - with 25000000000 nodes
-Limit: 78 ongoing - with 26000000000 nodes
-Limit: 78 ongoing - with 27000000000 nodes
-Limit: 78 ongoing - with 28000000000 nodes
-Limit: 78 ongoing - with 29000000000 nodes
-Limit: 78 ongoing - with 30000000000 nodes
-Limit: 78 ongoing - with 31000000000 nodes
-Limit: 78 ongoing - with 32000000000 nodes
-Limit: 78 ongoing - with 33000000000 nodes
-Limit: 78 ongoing - with 34000000000 nodes
-Limit: 78 ongoing - with 35000000000 nodes
-Limit: 78 ongoing - with 36000000000 nodes
-Limit: 78 ongoing - with 37000000000 nodes
-Limit: 78 ongoing - with 38000000000 nodes
-Limit: 78 ongoing - with 39000000000 nodes
-Limit: 78 ongoing - with 40000000000 nodes
-Limit: 78 ongoing - with 41000000000 nodes
-Limit: 78 ongoing - with 42000000000 nodes
-Limit: 78 ongoing - with 43000000000 nodes
-Limit: 78 ongoing - with 44000000000 nodes
-Limit: 78 ongoing - with 45000000000 nodes
-Limit: 78 ongoing - with 46000000000 nodes
-Limit: 78 ongoing - with 47000000000 nodes
-Limit: 78 ongoing - with 48000000000 nodes
-Limit: 78 ongoing - with 49000000000 nodes
-Limit: 78 ongoing - with 50000000000 nodes
-Limit: 78 ongoing - with 51000000000 nodes
-Limit: 78 ongoing - with 52000000000 nodes
-Limit: 78 ongoing - with 53000000000 nodes
-Limit: 78 ongoing - with 54000000000 nodes
-Limit: 78 ongoing - with 55000000000 nodes
 Limit: 78 completed with 55700838242 nodes
-Limit: 80 ongoing - with 1000000000 nodes
-Limit: 80 ongoing - with 2000000000 nodes
-Limit: 80 ongoing - with 3000000000 nodes
-Limit: 80 ongoing - with 4000000000 nodes
-Limit: 80 ongoing - with 5000000000 nodes
-Limit: 80 ongoing - with 6000000000 nodes
-Limit: 80 ongoing - with 7000000000 nodes
 
 Tile movements to arrive in this state:
  12 11 15 14 13 9 5 1 2 6 7 8 11 12 14 13 9 5 1 7 8 15 13 9 5 1 7 8 6 3 4 11 12 13 9 5 1 7 8 2 3 4 15 9 10 6 4 15 11 12 13 14 5 1 6 4 2 3 15 11 12 13 14 5 1 6 7 8 4 2 11 12 9 10 2 7 8 4 3 15
@@ -238,6 +163,6 @@ Limit: 80 halted at 7912225376 nodes
 
 Solution of length 80 found after searching 68924903568 nodes
 
-real  68m17.528s
-user  68m9.360s
-sys 0m0.584s
+real  24m8.855s
+user  24m8.476s
+sys 0m0.200s

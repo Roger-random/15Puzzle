@@ -120,6 +120,55 @@ u64 PackTable()
 
 /////////////////////////////////////////////////////////////////////////////
 //
+// Pack the given puzzle array (each element is the tile number at that space)
+// into the 48-bit representation of their walking distance displacement.
+// Can calculate either vertical or horizontal depending on flipAxis parameter.
+
+u64 PackPuzzle(int* puzzle, int flipAxis)
+{
+  int i,j;
+  int tileNum;
+
+  int work[BOARD_WIDTH];  // Temporary work space
+
+  u64 packedPuzzle = 0;
+
+  for (i=0;i<BOARD_WIDTH;i++)
+  {
+    // Zero out work array
+    for (j=0; j<BOARD_WIDTH; j++)
+    {
+      work[j] = 0;
+    }
+
+    // Look at each of the tiles in this row.
+    for (j=0; j<BOARD_WIDTH; j++)
+    {
+      tileNum = flipAxis? CONV[puzzle[j*BOARD_WIDTH + i]] : puzzle[i*BOARD_WIDTH + j];
+
+      if (tileNum == 0)
+      {
+        // Skip blank tile
+        continue;
+      }
+      // Take the tile number, subtract one, then drop the least significant 
+      // 2 bits (a.k.a. divide by four) gives us the desired row number for
+      // that tile. Increment the desired row counter in the work array.
+      work[(tileNum-1)>>2]++;
+    }
+
+    // Pack results of work array into lookup table encoding
+    for (j=0; j<BOARD_WIDTH; j++)
+    {
+      packedPuzzle = (packedPuzzle<<3) | work[j];
+    }
+  }
+
+  return packedPuzzle;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//
 // Initialize the link table entry at the given index to the starting value
 // of WDTBL_SIZE
 
@@ -207,7 +256,8 @@ void GenerateWalkingDistanceLookup()
   // The breadth-first search begins with the solved puzzle state and expands
   // from there to the full Walking Distance table configurations.
 
-  // Create TABLE representing the solved state
+  // Create TABLE representing the solved state. 
+  // First initialize to zero.
   for (i=0; i<4; i++)
   {
     for (j=0; j<4; j++)
@@ -215,15 +265,13 @@ void GenerateWalkingDistanceLookup()
       TABLE[i][j] = 0;
     }
   }
-  TABLE[0][0] = TABLE[1][1] = TABLE[2][2] = 4;
-  TABLE[3][3] = 3;
-
-  // Encode TABLE to its 48-bit representation
-  packedTable = PackTable();
+  // Then fill in the diagonals representing tiles in their proper places.
+  TABLE[0][0] = TABLE[1][1] = TABLE[2][2] = 4; // 4 tiles in correct row positions
+  TABLE[3][3] = 3; // 3 tiles in correct row position for final row.
 
   // The solved state and its representation sits at the beginning of the
   // Walking Distance lookup table.
-  WDPTN[0] = packedTable; // Representing the solved TABLE configuration
+  WDPTN[0] = PackTable(); // Representing the solved TABLE configuration
   WDTBL[0] = 0;           // Solved state has walking distance of zero.
 
   // Initialize the transition lookup entry for the solved state.
@@ -341,10 +389,53 @@ void PrintPuzzle(int puzzle[PUZZLE_SIZE])
 
 /////////////////////////////////////////////////////////////////////////////
 //
+//  Calculates the inversion count used for lookup into the inversion distance
+//  heuristic. Can flip the axis of calculation via flipAxis parameter.
+
+int InversionCount(int* puzzle, int flipAxis)
+{
+  int i,j;
+  int inversionCount = 0;
+  int currentTile;
+  int compareTile;
+
+  // For tile position index i, convp[i] will be the index of the position
+  // of the flipped-axis array.
+  int convp[PUZZLE_SIZE] = { 
+    0, 4, 8,12, 
+    1, 5, 9,13, 
+    2, 6,10,14, 
+    3, 7,11,15
+  };
+
+  for (i=0; i<PUZZLE_SIZE; i++)
+  {
+    currentTile = flipAxis ? CONV[puzzle[convp[i]]] : puzzle[i];
+  
+    if (currentTile) // Skip blank
+    {
+      for (j=i+1; j<PUZZLE_SIZE; j++)
+      {
+        compareTile = flipAxis ? CONV[puzzle[convp[j]]] : puzzle[j];
+
+        if (compareTile && compareTile<currentTile) 
+        {
+          // Not blank && Inverted ordering
+          inversionCount++;
+        }
+      }
+    }
+  }
+
+  return inversionCount;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//
 //  Given the full set of indices, calculate the lower bound value to use
 //  as heuristic for the IDA* search.
 
-int CalculateValue(int idxV, int idxH, int invV, int invH)
+int HeuristicValue(int idxV, int idxH, int invV, int invH)
 {
   int wdV = WDTBL[idxV]; // Walking Distance for vertical tile movements.
   int wdH = WDTBL[idxH]; // Walking Distance for horizontal tile movements.
@@ -367,143 +458,30 @@ int CalculateValue(int idxV, int idxH, int invV, int invH)
 //  fall back to performing this full calculation. But it is not recommended,
 //  it is extremely computationally expensive to do this for each tree node.
 
-int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *pinv2)
+int HeuristicLookupIndices(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *pinv2)
 {
-  int i, j, num1, num2;
   int idx1, idx2, inv1, inv2;
-  u64 table;
-
-  int work[PUZZLE_COLUMN];
-
-  // For tile position index i, convp[i] will be the index of the position
-  // of the flipped-axis array.
-  int convp[PUZZLE_SIZE] = { 
-    0, 4, 8,12, 
-    1, 5, 9,13, 
-    2, 6,10,14, 
-    3, 7,11,15
-  };
+  u64 packedPuzzle;
 
   // Calculate IDX1 - index into the Walking Distance table corresponding to
   // the minimum number of tile movements across rows. (Vertical tile moves.)
-
-  // Examine the table and pack representation into 'table' value.
-  table = 0;
-  for (i=0;i<PUZZLE_ROW;i++)
-  {
-    // Zero out work array
-    for (j=0; j<PUZZLE_COLUMN; j++)
-    {
-      work[j] = 0;
-    }
-
-    // Look at each of the tiles in this row.
-    for (j=0; j<PUZZLE_COLUMN; j++)
-    {
-      num1 = puzzle[i*PUZZLE_COLUMN + j];
-      if (num1 == 0)
-      {
-        // Skip blank tile
-        continue;
-      }
-      // Take the tile number, subtract one, then drop the least significant 
-      // 2 bits (a.k.a. divide by four) gives us the desired row number for
-      // that tile. Increment the desired row counter in the work array.
-      work[(num1-1)>>2]++;
-    }
-
-    // Pack results of work array into table encoding
-    for (j=0; j<PUZZLE_COLUMN; j++)
-    {
-      table = (table<<3) | work[j];
-    }
-  }
+  packedPuzzle = PackPuzzle(puzzle, FALSE);
 
   // Look for index of the WDPTN entry corresponding to this pattern.
-  for (idx1=0; WDPTN[idx1] != table; idx1++);
+  for (idx1=0; WDPTN[idx1] != packedPuzzle; idx1++);
 
   // Calculate IDX2 - repeat the calculation made for IDX1, but this time
-  // for movement across columns. (Horizontal tile moves.) We can use the
-  // same lookup table as that used for rows by swapping the axis in all 
-  // the lookup indices
-
-  // Again - pack the representation into 'table'
-  table = 0;
-  for (i=0; i<PUZZLE_COLUMN; i++)
-  {
-    // Zero out work array
-    for (j=0; j<PUZZLE_ROW; j++)
-    {
-      work[j] = 0;
-    }
-
-    // Look at each of the tiles in this column.
-    for (j=0; j<PUZZLE_ROW; j++)
-    {
-      num2 = CONV[puzzle[j*PUZZLE_ROW + i]];
-      if (num2 == 0)
-      {
-        // Skip blank tile
-        continue;
-      }
-      // Take the tile number, subtract one, then drop the least significant 
-      // 2 bits (a.k.a. divide by four) gives us the desired row number for
-      // that tile. Increment the desired row counter in the work array.
-      work[(num2-1)>>2]++;
-    }
-
-    // Pack results of work array into table encoding
-    for (j=0; j<PUZZLE_COLUMN; j++)
-    {
-      table = (table<<3) | work[j];
-    }
-  }
+  // for movement across columns. (Horizontal tile moves.) 
+  packedPuzzle = PackPuzzle(puzzle, TRUE);
 
   // Look for index of the WDPTN entry corresponding to this pattern.
-  for (idx2=0; WDPTN[idx2] != table; idx2++);
+  for (idx2=0; WDPTN[idx2] != packedPuzzle; idx2++);
 
   // Calculate inv1 - the number of tile inversions along the horizontal axis
-  inv1 = 0;
-  for (i=0; i<PUZZLE_SIZE; i++)
-  {
-    num1 = puzzle[i];
-    if (!num1)
-    {
-      // Skip blank
-      continue;
-    }
-
-    for (j=i+1; j<PUZZLE_SIZE; j++)
-    {
-      num2 = puzzle[j];
-      if (num2 && num2<num1)
-      {
-        inv1++;
-      }
-    }
-  }
+  inv1 = InversionCount(puzzle, FALSE);
 
   // Calculate inv1 - the number of tile inversions along the vertical axis
-  // Code is much like above except for use of the CONV and convp lookup arrays
-  // to help us swap the axis.
-  inv2 = 0;
-  for (i=0; i<PUZZLE_SIZE; i++)
-  {
-    num1 = CONV[puzzle[convp[i]]];
-    if (!num1)
-    {
-      // Skip blank
-      continue;
-    }
-    for (j=i+1; j<PUZZLE_SIZE; j++)
-    {
-      num2 = CONV[puzzle[convp[j]]];
-      if (num2 && num2<num1)
-      {
-        inv2++;
-      }
-    }
-  }
+  inv2 = InversionCount(puzzle, TRUE);
 
   // Copy values to outparams.
   *pidx1 = idx1;
@@ -511,7 +489,7 @@ int CalculateIndicesFull(int* puzzle, int *pidx1, int *pidx2, int *pinv1, int *p
   *pinv1 = inv1;
   *pinv2 = inv2;
 
-  return CalculateValue(idx1, idx2, inv1, inv2);
+  return HeuristicValue(idx1, idx2, inv1, inv2);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -523,7 +501,7 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
   int idx1o, int idx2o, int inv1o, int inv2o,
   int currentLength, int limitLength, unsigned long long *nodeCounter)
 {
-  int val = CalculateValue(idx1o, idx2o, inv1o, inv2o);;
+  int val = HeuristicValue(idx1o, idx2o, inv1o, inv2o);;
 
   (*nodeCounter)++;
 
@@ -755,7 +733,7 @@ int IDAStar(int puzzle[PUZZLE_SIZE])
   unsigned long long nodesAtLimit = 0;
   int length = 0;
   int idx1, idx2, inv1, inv2;
-  int limit = CalculateIndicesFull(puzzle, &idx1, &idx2, &inv1, &inv2);
+  int limit = HeuristicLookupIndices(puzzle, &idx1, &idx2, &inv1, &inv2);
 
   int blankIndex = GetBlankPosition(puzzle);
 
@@ -820,37 +798,9 @@ int TilesAreUnique(int* puzzle)
 //
 //  Validation stage 2: Verify puzzle is solvable via inversion count rules.
 
-int InversionCountOf(int* puzzle)
-{
-  int inversionCount = 0;
-  int currentTile = 0;
-  int compareTile = 0;
-  int i = 0;
-  int j = 0;
-
-  for (i = 0; i < PUZZLE_SIZE; i++)
-  {
-    currentTile = puzzle[i];
-
-    if (currentTile > 0)
-    {
-      for( j = i; j < PUZZLE_SIZE; j++)
-      {
-        compareTile = puzzle[j];
-        if (compareTile != 0 && compareTile < currentTile)
-        {
-          inversionCount++;
-        }
-      }
-    }
-  }
-
-  return inversionCount;
-}
-
 int PuzzleIsSolvable(int* puzzle)
 {
-  int inversionCountIsEven = ((InversionCountOf(puzzle) % 2) == 0);
+  int inversionCountIsEven = ((InversionCount(puzzle,FALSE) % 2) == 0);
   int solvable = 0;
 
   if (PUZZLE_COLUMN % 2 == 0)
@@ -949,7 +899,7 @@ int main()
 
   ReadPuzzleFromInput(puzzle);
 
-  printf("Initial heuristic value of %d\n\n", CalculateIndicesFull(puzzle, &idx1, &idx2, &inv1, &inv2));
+  printf("Initial heuristic value of %d\n\n", HeuristicLookupIndices(puzzle, &idx1, &idx2, &inv1, &inv2));
 
   IDAStar(puzzle);
  }

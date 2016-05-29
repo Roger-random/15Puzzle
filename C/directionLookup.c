@@ -534,7 +534,7 @@ int Valid(int* puzzle)
 
 void ReadPuzzleFromInput(int* puzzle)
 {
-  int i;
+  int i, j;
 
   // printf("15-Puzzle solver\n\n");
   // printf("Here are the tile position indices:\n\n");
@@ -553,7 +553,15 @@ void ReadPuzzleFromInput(int* puzzle)
 
     for(i = 0; i < PUZZLE_SIZE; i++)
     {
-      scanf("%d", &puzzle[i]);
+      j = scanf("%d", &puzzle[i]);
+      if(j==EOF)
+      {
+        break;
+      }
+      else if (j != 1)
+      {
+        printf("ERROR: Expected 1 input, got %d\n", j);
+      }
     }
 
     printf("\nThe input received were as follows:\n\n");

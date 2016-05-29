@@ -22,9 +22,18 @@
 //  
 //  Goals of adaptation in priority order:
 //  * Bring up to current C standard.
-//  * Eliminate use of global variables.
 //  * More comments, and in English.
-//  * Add flexibility for configuration other than 4x4 15-puzzle
+//  * Eliminate use of global variables.
+//  
+//  Originally I had the ambition to add flexibility for configuration other 
+//  than 4x4 15-puzzle but that's going to be difficult. Problems are:
+//  1. Current implementation depends on the puzzle being a square (with same
+//     dimension on both sides) because it reuses the same lookup table for
+//     both horizontal and vertical axis. The only way to do a non-square
+//     puzzle (like 4x5 19-puzzle) would require two separate tables.
+//  2. The lookup table size shoots up tremendously with size. When size is 4
+//     the table can still fit in L3 cache. Table of 5 is going to dump into
+//     main memory... would the memory latency kill us?
 //
 #define BOARD_WIDTH 4
 
@@ -33,15 +42,52 @@
 
 typedef unsigned long long u64; // MSVC 'unsigned __int64' now C99 'unsigned long long'
 
+// Each element in TABLE is a count of the number of tiles mapping their 
+// current row  against their desired row.
+//
+// Rephrase: TABLE[i][j] holds the count of tiles that are currently in row
+//  i and need to be in row j for the puzzle's solved state. When i equals
+//  j, that count is the number of tiles sitting in their correct final row.
+//
+// Example: TABLE representing the solved state, with all tiles in their
+//  correct position (and therefore correct row) would look like this:
+//             
+//      j=0  1  2  3
+//
+// i = 0  4  0  0  0
+// i = 1  0  4  0  0
+// i = 2  0  0  4  0
+// i = 3  0  0  0  3
 int   TABLE[BOARD_WIDTH][BOARD_WIDTH];
+
+// WDTOP and WDEND are used while generating the lookup table via breadth
+// first search. WDTOP represents the end of the closed list, and WDEND 
+// represents the end of the open list. Everything in between are nodes still
+// still to be examined. Table generation ends when WDTOP catches up to WDEND
+// (The values of which, when things work correctly, would be WDTBL_SIZE.)
 int   WDTOP, WDEND;
+
+// The value of a WDPTN element is a representation of a particular TABLE
+// configuration. So given a TABLE, we can pack it into a pattern and perform
+// a linear search of WDPTN until we find a match. The index value is used to 
+// look at WDTBL to retrieve the Walking Distance corresponding to the TABLE.
 u64   WDPTN[WDTBL_SIZE];
-short WDLNK[WDTBL_SIZE][2][BOARD_WIDTH];
 char  WDTBL[WDTBL_SIZE];
+
+// WDLNK table stores transitions from one TABLE pattern to another. This
+// allows the Walking Distance values to be updated without going through the
+// steps of packing the TABLE and searching in WDPTN.
+short WDLNK[WDTBL_SIZE][2][BOARD_WIDTH];
+
+// Something to do with tile inversion distance...
 char  IDTBL[IDTBL_SIZE];
 
-int CONV[PUZZLE_SIZE] = { // Flips the board 90-degrees so we can reuse
-  0,                      // lookup table along the other axis.
+// Walking Distance performs its calculations along one axis, then repeats
+// the calculation along the other axis. The CONVersion table here is used
+// to map tile positions across this axis flip, so that the same lookup
+// tables can be used for both horizontal and vertical calculation.
+int CONV[PUZZLE_SIZE] = {
+  0,
   1, 5, 9,13,
   2, 6,10,14,
   3, 7,11,15,
@@ -60,7 +106,7 @@ void WriteTable(char count, int vect, int group)
   {
     for (j=0; j<4; j++)
     {
-      // TABLEis a 4x4 array like the game board.
+      // TABLE is a 4x4 array like the game board.
       // TABLE[i][j] is something that can be represented in 3 bits (0-7) and
       // we're packing that into (16*3) = 48 bits, storing in a 64-bit value
       // 'table'
@@ -459,51 +505,6 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
 
   val = lowb1 + lowb2;
 
-
-/*  {
-    // Verification block
-    int verify, vidx1, vidx2, vinv1, vinv2;
-    verify = CalculateIndicesFull(puzzle, &vidx1, &vidx2, &vinv1, &vinv2);
-
-    if (verify != val)
-    {
-      printf("Full calculation returned value of %d but partial update got %d\n", verify, val);
-      fallback = 1;
-    }
-
-    if (vidx1 != idx1)
-    {
-      printf("Full calculation returned idx1 of %d but partial update got %d\n", vidx1, idx1);
-    }
-
-    if (vidx2 != idx2)
-    {
-      printf("Full calculation returned idx2 of %d but partial update got %d\n", vidx2, idx2);
-    }
-
-    if (vinv1 != inv1)
-    {
-      printf("Full calculation returned inv1 of %d but partial update got %d\n", vinv1, inv1);
-    }
-
-    if (vinv2 != inv2)
-    {
-      printf("Full calculation returned inv2 of %d but partial update got %d\n", vinv2, inv2);
-    }
-
-    if (fallback)
-    {
-      val = verify;
-    }
-  }
-*/
-
-  // START Debug dump
-  // printf("%d: blank at %d, prev %d. Length %d + Value %d against Limit %d\n",
-  //   *nodeCounter, currentBlankIndex, prevBlankIndex, currentLength, val, limitLength);
-  // PrintPuzzle(puzzle);
-  // END Debug dump
-
   if (val == 0)
   {
     // Problem solved!
@@ -526,8 +527,6 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
     int row=0, col=0, ret=0, childBlankIndex=0;
 
     GetColumnRow(currentBlankIndex, &col, &row);
-
-    // printf("Starting idx1=%d idx2=%d inv1=%d inv2=%d\n", idx1, idx2, inv1, inv2);
 
     for (int i = 0; i < 4; i++)
     {
@@ -561,8 +560,6 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
           }
 
           idx1 = WDLNK[idx1][1][(puzzle[childBlankIndex]-1)>>2];
-
-          // printf("Updated 1A idx1=%d inv1=%d\n",idx1,inv1);
         }
       }
       else if (i == 1)
@@ -592,8 +589,6 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
 
           // Use the link table to update the index corresponding to the moved tile.
           idx1 = WDLNK[idx1][0][(puzzle[childBlankIndex]-1)>>2];
-
-          // printf("Updated 1B idx1=%d inv1=%d\n",idx1,inv1);
         }
       }
       else if (i == 2)
@@ -635,8 +630,6 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
           }
 
           idx2 = WDLNK[idx2][1][(convTile-1)>>2];
-
-          // printf("Updated 2A idx2=%d inv2=%d\n", idx2, inv2);
         }
       }
       else if (i == 3)
@@ -678,15 +671,12 @@ int ExamineNode(int puzzle[PUZZLE_SIZE],
           }
 
           idx2 = WDLNK[idx2][0][(convTile-1) >> 2];
-
-          // printf("Updated 2B idx2=%d inv2=%d\n", idx2, inv2);
         }
       }
 
       if(childBlankIndex == prevBlankIndex)
       {
         // This retracts the move our parent just did, no point.
-        // printf("Reverted\n");
         continue;
       }
 

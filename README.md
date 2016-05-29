@@ -10,7 +10,7 @@ The root directory (initial exercise) is based on HTML and JavaScript. It is a U
 
 ## Directory: /C/
 
-This directory holds the exercises written in straight C. The code in this directory has no UI to speak of, they are about finding the optimal solution to solving the 15 sliding tile puzzle. By working in straight C, the goal is for maximum portability and bare-to-the-metal speed. 
+This directory holds the exercises written in straight C. The code in this directory has no UI to speak of, they are about finding the optimal solution to solving the 15 sliding tile puzzle. By working in straight C, the goal is for maximum portability and bare-to-the-metal speed. There's nothing new here, it's stuff people have done before. See http://kociemba.org/fifteen/fifteensolver.html
 
 #### 15puz-idas.c
 This applies the iterative-deepening A\* (IDA\*) algorithm to solving the puzzle, using the Manhattan Distance heuristic.
@@ -21,7 +21,7 @@ This applies the iterative-deepening A\* (IDA\*) algorithm to solving the puzzle
 
 #### puzWD.c
 
-This applies the same IDA\* algorithm to the puzzle, but using the Walking Distance heuristic (as described by Ken'ichiro Takahashi and adapted from his/her code) supplemented by the Inversion Distance heuristic. 
+This applies the same IDA\* algorithm to the puzzle, but using the Walking Distance heuristic (as described by Ken'ichiro Takahashi and adapted from his/her code) supplemented by the Inversion Distance heuristic. http://www.ic-net.or.jp/home/takaken/nt/slide/solve15.html
 
 **Advantage**: Compared to Manhattan Distance, it culls the number of nodes examined by as much as 98%. 
 
